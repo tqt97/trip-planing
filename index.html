@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#163f35">
+  <meta name="description" content="Ní ơi, mình đi đâu thế — planner Đà Lạt giúp lưu địa điểm, xem khoảng cách quanh Home, gợi ý nơi nên đi, gom điểm gần nhau và theo dõi chi tiêu chuyến đi.">
+  <meta name="keywords" content="Đà Lạt, du lịch Đà Lạt, planner Đà Lạt, địa điểm Đà Lạt, quán ăn Đà Lạt, cafe Đà Lạt, chi tiêu chuyến đi, bản đồ Đà Lạt">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
+  <meta name="application-name" content="Đà Lạt Nearby Planner">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ní ơi">
+  <meta name="format-detection" content="telephone=no,address=no,email=no">
+  <meta name="color-scheme" content="light">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="vi_VN">
+  <meta property="og:site_name" content="Đà Lạt Nearby Planner">
+  <meta property="og:title" content="Ní ơi, mình đi đâu thế — Đà Lạt Nearby Planner">
+  <meta property="og:description" content="Lưu địa điểm, xem radar quanh Home, gợi ý nơi nên đi và theo dõi chi tiêu cho chuyến Đà Lạt.">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Ní ơi, mình đi đâu thế — Đà Lạt Nearby Planner">
+  <meta name="twitter:description" content="Planner mobile-first cho chuyến Đà Lạt: địa điểm, radar, gợi ý và chi tiêu.">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Đà Lạt Nearby Planner","alternateName":"Ní ơi, mình đi đâu thế","applicationCategory":"TravelApplication","operatingSystem":"Any","inLanguage":"vi-VN","description":"Planner Đà Lạt để lưu địa điểm, xem khoảng cách quanh Home, gợi ý nơi nên đi và theo dõi chi tiêu chuyến đi."}</script>
+  <title>Đà Lạt Nearby Planner</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="authGate" class="auth-gate" hidden>
+    <div class="auth-card glass">
+      <span class="badge warm">TRIP V2 · CÙNG NHAU</span>
+      <h2>Cùng nhau lên kèo Đà Lạt.</h2>
+      <p>Đăng nhập Google để cả nhóm cùng xem, vote, thêm địa điểm và cập nhật chi tiêu theo thời gian thực.</p>
+      <button id="googleLoginBtn" class="primary auth-login" type="button">Đăng nhập với Google</button>
+      <p id="authMessage" class="meta" role="status"></p>
+    </div>
+  </div>
+  <div class="atmosphere" aria-hidden="true"><i></i><i></i><i></i></div>
+  <header class="topbar">
+    <div class="brand-wrap"><div class="brand-title"><p class="eyebrow">ĐÀ LẠT · TRIP COMPANION</p><h1>Ní ơi, mình đi đâu thế.</h1></div><p class="subtitle">Lên danh sách, xem khoảng cách và chọn nơi đáng đi ngay lúc này.</p></div>
+    <div class="top-actions desktop-actions"><button class="ghost" id="membersBtn">Nhóm</button><button class="ghost user-chip" id="userBtn" title="Tài khoản">Đang kết nối…</button><button class="ghost" id="exportBtn">Xuất</button><label class="ghost file-label">Nhập<input id="importInput" type="file" accept="application/json"></label><button class="primary" id="addBtn">+ Thêm địa điểm</button></div>
+  </header>
+
+  <main class="shell">
+    <section class="hero-card glass">
+      <div class="home-copy"><span class="badge">🏠 HOME BASE</span><h2 id="homeTitle">Đang tải Home…</h2><p id="homeMeta">Đang đọc tọa độ từ environment.</p></div>
+      <div class="home-actions"><button class="secondary" id="homeMapBtn" type="button">Google Maps</button><button class="ghost group-mobile-btn" id="mobileMembersBtn" type="button">Nhóm</button><button class="ghost" id="homeBtn" type="button">Chi tiết</button></div>
+    </section>
+
+    <section class="stats" aria-label="Tổng quan"><article><span>Đã lưu</span><strong id="statTotal">0</strong></article><article><span>Trong bán kính</span><strong id="statNearby">0</strong></article><article><span>Must go</span><strong id="statMust">0</strong></article><article><span>Khoảng cách TB</span><strong id="statAvg">—</strong></article></section>
+
+    <section class="radar-card glass collapsible-section" aria-labelledby="radarTitle">
+      <div class="section-heading compact section-collapse-hit" role="button" tabindex="0" aria-expanded="true">
+        <div><span class="badge">🧭 RADAR HOME</span><h2 id="radarTitle">Vị trí quanh Home</h2></div>
+      </div>
+      <div class="radar-layout">
+        <aside class="radar-controls-panel" aria-label="Bộ lọc radar">
+          <div class="radar-controls">
+            <label class="filter-field"><span>Danh mục</span><select id="radarCategorySelect"><option value="all">Tất cả</option><option value="food">🍜 Ăn</option><option value="cafe">☕ Cafe</option><option value="attraction">🌲 Chơi</option><option value="shopping">🛍 Mua</option><option value="other">📌 Khác</option></select></label>
+            <label class="filter-field"><span>Khoảng cách</span><select id="radarRadiusSelect"><option value="1">≤ 1 km</option><option value="3">≤ 3 km</option><option value="5" selected>≤ 5 km</option><option value="10">≤ 10 km</option><option value="9999">Tất cả</option></select></label>
+          </div>
+          <div class="radar-legend"><span><i class="legend-dot must"></i>Must go</span><span><i class="legend-dot want"></i>Muốn đi</span><span><i class="legend-dot maybe"></i>Có thể</span></div>
+        </aside>
+        <div class="radar-main">
+          <p id="radarSummary" class="radar-summary">Đang chuẩn bị radar…</p>
+          <p id="radarEmpty" class="radar-empty-message" hidden>Thêm địa điểm có tọa độ để xem radar quanh Home.</p>
+          <div class="radar-stage"><svg id="radarSvg" class="radar-svg" viewBox="0 0 520 520" preserveAspectRatio="xMidYMid meet"></svg></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="recommend-card glass collapsible-section"><div class="section-heading section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge warm">✨ GỢI Ý</span><h2>Nên đi đâu tiếp?</h2></div><div class="section-head-actions"><p>Chạm một gợi ý để mở Google Maps.</p></div></div><div id="recommendations" class="recommend-grid"></div></section>
+
+    <section class="places-section glass collapsible-section">
+      <div class="section-heading compact section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge">📍 PLACES</span><h2>Danh sách địa điểm</h2></div><div class="section-head-actions"><p id="resultCount">0 địa điểm</p></div></div>
+      <details class="place-filters" id="placeFilters" open><summary><span>⚙ Bộ lọc</span><small id="filterSummary">5 km · Tất cả</small></summary><div class="toolbar-wrap"><div class="toolbar">
+        <label class="filter-field search-field"><span>Tìm kiếm</span><input id="searchInput" class="search" type="search" placeholder="Tên, địa chỉ, ghi chú…" autocomplete="off"></label>
+        <label class="filter-field"><span>Bán kính</span><select id="radiusSelect" aria-label="Bán kính"><option value="1">≤ 1 km</option><option value="3">≤ 3 km</option><option value="5" selected>≤ 5 km</option><option value="10">≤ 10 km</option><option value="9999">Tất cả</option></select></label>
+        <label class="filter-field"><span>Loại</span><select id="categorySelect" aria-label="Loại địa điểm"><option value="all">Tất cả</option><option value="food">🍜 Ăn</option><option value="cafe">☕ Cafe</option><option value="attraction">🌲 Chơi</option><option value="shopping">🛍 Mua</option><option value="other">📌 Khác</option></select></label>
+        <label class="filter-field"><span>Sắp xếp</span><select id="sortSelect" aria-label="Sắp xếp"><option value="distance">Gần nhất</option><option value="recommended">Đề xuất</option><option value="name">A–Z</option></select></label>
+        <label class="filter-field"><span>Mỗi trang</span><select id="pageSizeSelect" aria-label="Số địa điểm mỗi trang"><option value="4">4</option><option value="6">6</option><option value="8" selected>8</option><option value="10">10</option><option value="12">12</option><option value="20">20</option></select></label>
+      </div></div></details>
+      <div id="placesList" class="places-list"></div>
+      <nav id="pagination" class="pagination" aria-label="Phân trang địa điểm" hidden>
+        <button class="pager-btn" id="prevPageBtn" type="button" aria-label="Trang trước">←</button>
+        <div id="pageNumbers" class="page-numbers"></div>
+        <button class="pager-btn" id="nextPageBtn" type="button" aria-label="Trang sau">→</button>
+        <span id="pageSummary" class="page-summary"></span>
+      </nav>
+      <div id="emptyState" class="empty" hidden><div>🌲</div><h3>Chưa có nơi phù hợp</h3><p>Thêm địa điểm hoặc tăng bán kính.</p></div>
+    </section>
+
+
+    <section class="expense-card glass collapsible-section" id="expenseSection">
+      <div class="section-heading compact expense-heading section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge warm">$ CHI TIÊU</span><h2>Chi tiêu chuyến đi</h2></div><div class="expense-head-actions"><button class="primary compact-action expense-add-btn" id="addExpenseBtn" type="button"><span aria-hidden="true">＋</span><span class="expense-add-label">Khoản chi</span></button></div></div>
+      <div class="expense-summary"><span>Tổng chi tiêu</span><strong id="expenseTotal">0 ₫</strong><small id="expenseCount">0 khoản</small></div>
+      <div id="expenseList" class="expense-list"></div>
+      <div id="expenseEmpty" class="empty compact-empty" hidden><div>🧾</div><h3>Chưa có khoản chi</h3><p>Ghi lại chi phí để theo dõi tổng tiền chuyến đi.</p></div>
+    </section>
+
+    <section class="cluster-card glass collapsible-section" id="togetherSection"><div class="section-heading compact section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge together-badge">🧭 ĐI CÙNG NHAU</span><h2>Gom điểm gần nhau</h2></div><div class="section-head-actions"><p>Những nơi gần nhau để đi cùng một lượt.</p></div></div><div id="clusters" class="clusters"></div></section>
+  </main>
+
+  <button class="mobile-fab" id="mobileAddBtn" aria-label="Thêm địa điểm"><span class="fab-pin" aria-hidden="true">🗺️</span></button>
+  <nav class="mobile-nav" aria-label="Điều hướng nhanh"><button data-scroll="top">⌂<span>Tổng quan</span></button><button data-scroll="places">⌖<span>Địa điểm</span></button><button data-scroll="together">↗<span>Đi cùng nhau</span></button><button data-scroll="expenses"><b class="money-tab-icon" aria-hidden="true">$</b><span>Chi tiêu</span></button><button id="traceBtn">◎<span>Nhật ký</span></button></nav>
+
+  <dialog id="placeDialog"><form id="placeForm" method="dialog" novalidate class="place-form"><div class="dialog-head"><div><span class="badge">NEW PLACE</span><h2 id="placeDialogTitle">Thêm địa điểm</h2></div><button type="button" class="icon-btn close-dialog" aria-label="Đóng">×</button></div><input type="hidden" id="placeId"><label><span class="field-label">Tên địa điểm <b class="required-mark" aria-hidden="true">*</b><span class="sr-only"> bắt buộc</span></span><input id="placeName" maxlength="120" required placeholder="Bánh căn Nhà Chung"></label><label><span class="field-label">Google Maps URL</span><input id="placeMapsUrl" maxlength="2000" inputmode="url" placeholder="Dán link Google Maps"></label><label><span class="field-label">Địa chỉ</span><input id="placeAddress" maxlength="300" placeholder="13 Nhà Chung, Đà Lạt"></label><div class="form-grid form-grid-compact"><label><span class="field-label">Loại</span><select id="placeCategory"><option value="food">🍜 Ăn uống</option><option value="cafe">☕ Cafe</option><option value="attraction">🌲 Vui chơi</option><option value="shopping">🛍 Mua sắm</option><option value="other">📌 Khác</option></select></label><label><span class="field-label">Ưu tiên</span><select id="placePriority"><option value="must">🔥 Must go</option><option value="want" selected>⭐ Muốn đi</option><option value="maybe">💭 Có thể</option></select></label></div><label><span class="field-label">Ghi chú</span><textarea id="placeNote" maxlength="500" rows="3" placeholder="Ăn sáng, đi sớm, cần đặt bàn…"></textarea></label><details><summary>Tọa độ <b class="required-mark" aria-hidden="true">*</b><span class="sr-only"> bắt buộc</span></summary><div class="form-grid form-grid-compact"><label><span class="field-label">Latitude</span><input id="placeLat" inputmode="decimal" placeholder="11.9404"></label><label><span class="field-label">Longitude</span><input id="placeLng" inputmode="decimal" placeholder="108.4583"></label></div></details><p class="form-message" id="placeMessage" role="alert"></p><div class="dialog-actions"><button type="button" class="ghost close-dialog">Hủy</button><button type="submit" class="primary" id="savePlaceBtn">Lưu địa điểm</button></div></form></dialog>
+
+
+  <dialog id="expenseDialog"><form id="expenseForm" method="dialog" novalidate class="expense-form"><div class="dialog-head"><div><span class="badge warm">EXPENSE</span><h2 id="expenseDialogTitle">Thêm khoản chi</h2></div><button type="button" class="icon-btn close-expense" aria-label="Đóng">×</button></div><input type="hidden" id="expenseId"><label><span class="field-label">Người chi trả <b class="required-mark" aria-hidden="true">*</b></span><input id="expensePayer" maxlength="80" required placeholder="Ví dụ: Ní"></label><div class="form-grid"><label><span class="field-label">Hạng mục <b class="required-mark" aria-hidden="true">*</b></span><select id="expenseCategory"><option value="food">🍜 Ăn uống</option><option value="cafe">☕ Cafe</option><option value="transport">🛵 Di chuyển</option><option value="attraction">🎟 Vé / vui chơi</option><option value="shopping">🛍 Mua sắm</option><option value="stay">🏡 Lưu trú</option><option value="other">📌 Khác</option></select></label><label><span class="field-label">Số tiền <b class="required-mark" aria-hidden="true">*</b></span><input id="expenseAmount" type="number" min="1" step="1000" inputmode="numeric" required placeholder="150000"></label></div><label><span class="field-label">Ghi chú</span><textarea id="expenseNote" maxlength="300" rows="3" placeholder="Bữa tối, vé tham quan…"></textarea></label><p class="form-message" id="expenseMessage" role="alert"></p><div class="dialog-actions"><button type="button" class="ghost close-expense">Hủy</button><button type="submit" class="primary" id="saveExpenseBtn">Lưu khoản chi</button></div></form></dialog>
+
+  <dialog id="homeDialog"><form id="homeForm" method="dialog" novalidate><div class="dialog-head"><div><span class="badge">HOME BASE</span><h2>Home cố định</h2></div><button type="button" class="icon-btn close-home" aria-label="Đóng">×</button></div><p class="meta">Home được đọc từ <code>.env.local</code>.</p><label>Tên Home<input id="homeAddress" disabled></label><div class="form-grid"><label>Latitude<input id="homeLat" disabled></label><label>Longitude<input id="homeLng" disabled></label></div><p class="form-message" id="homeMessage" role="alert"></p><div class="dialog-actions"><button type="button" class="primary close-home">Đóng</button></div></form></dialog>
+
+  <dialog id="membersDialog" class="members-dialog"><div class="members-panel"><div class="dialog-head"><div><span class="badge">GROUP</span><h2>Nhóm đi cùng</h2></div><button type="button" class="icon-btn" id="closeMembersBtn" aria-label="Đóng">×</button></div><p class="meta" id="memberRoleInfo"></p><div id="membersList" class="members-list"></div><div class="dialog-actions members-actions"><button type="button" class="ghost danger-text" id="signOutBtn">Đăng xuất</button><button type="button" class="primary" id="doneMembersBtn">Xong</button></div></div></dialog>
+
+  <dialog id="traceDialog" class="trace-dialog"><div class="trace-panel"><div class="dialog-head"><div><span class="badge">DIAGNOSTICS</span><h2>Nhật ký hệ thống</h2></div><button type="button" class="icon-btn" id="closeTraceBtn">×</button></div><div id="systemHealth" class="health-card"></div><div class="trace-actions"><button class="ghost" id="copyTraceBtn">Copy log</button><button class="ghost" id="clearTraceBtn">Xóa log</button></div><div id="traceList" class="trace-list"></div></div></dialog>
+
+  <button id="backToTop" class="back-to-top" type="button" aria-label="Lên đầu trang" title="Lên đầu trang">↑<span>🌲</span></button>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
