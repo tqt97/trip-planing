@@ -7,7 +7,7 @@
 - Checklist hiển thị người đã check done bằng avatar chữ cái đầu email.
 - Production hiện tại chỉ cần chạy `supabase/migrations/003_album_checklist_completion.sql`.
 
-# Đà Lạt Nearby Planner v2.7.1
+# Đà Lạt Nearby Planner v2.7.3
 
 Mobile-first trip planner với hai data mode rõ ràng:
 

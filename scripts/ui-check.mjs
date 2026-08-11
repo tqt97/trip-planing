@@ -6,7 +6,7 @@ const app = fs.readFileSync('app.js','utf8');
 const main = fs.readFileSync('src/app/main.js','utf8');
 const modules = [
   'src/app/ui.js','src/app/storage.js','src/app/radar-view.js','src/app/demo-seed.js','src/app/app-shell.js','src/app/bindings.js',
-  'src/data/supabase-client.js','src/data/repository.js','src/features/checklists/checklist-view.js','src/features/checklists/checklist-controller.js','src/features/places/place-media.js','src/features/album/album-view.js','src/features/album/album-controller.js','src/features/album/album-media.js'
+  'src/data/supabase-client.js','src/data/repository.js','src/features/common/pagination-view.js','src/features/expenses/expense-view.js','src/features/expenses/expense-controller.js','src/features/checklists/checklist-view.js','src/features/checklists/checklist-controller.js','src/features/places/place-media.js','src/features/album/album-view.js','src/features/album/album-controller.js','src/features/album/album-media.js'
 ].map((f)=>[f,fs.readFileSync(f,'utf8')]);
 const assert = (ok, message) => { if (!ok) throw new Error(`UI check failed: ${message}`); };
 const has = (re) => re.test(css);
@@ -54,6 +54,16 @@ assert(css.includes('.album-strip') && css.includes('.check-completer'), 'v2.7 a
 assert(/\.album-strip\s*\{[^}]*grid-template-columns:\s*repeat\(4/.test(css) && /@media\s*\(max-width:\s*820px\)[\s\S]*?\.album-strip\s*\{[^}]*grid-template-columns:\s*repeat\(2/.test(css), 'album must use responsive thumbnail grid instead of horizontal scroller');
 assert(html.includes('class="album-toolbar"') && !html.includes('id="albumImagePreview"'), 'album filter placement or preview removal regression');
 assert(css.includes('.checklist-row') && css.includes('.place-image-preview'), 'v2.6 feature styles missing');
+
+assert(html.includes('id="addAlbumBtn" type="button">Thêm ảnh</button>'), 'Album CTA must say Thêm ảnh');
+assert(html.includes('id="expensePagination"') && html.includes('id="albumPagination"'), 'Expense and Album pagination controls missing');
+const compactPagerSource = fs.readFileSync('src/features/common/pagination-view.js', 'utf8');
+const placeViewSource = fs.readFileSync('src/features/places/place-view.js', 'utf8');
+assert(compactPagerSource.includes('page.totalPages > 1') && placeViewSource.includes('page.totalPages > 1'), 'Pagination must stay hidden when content fits on one page');
+assert(!html.includes('albumLightboxPlaceholder') && !css.includes('album-lightbox-placeholder'), 'unused album lightbox placeholder must stay removed');
+assert(/\.album-toolbar\{[^}]*display:flex[^}]*gap:10px[^}]*min-width:0/s.test(css), 'Album toolbar must keep balanced flex spacing');
+assert(/@media \(max-width:420px\)\{[^}]*\.album-toolbar\{[^}]*gap:6px/s.test(css), 'Album toolbar must stay compact on small phones');
+
 assert(!/<script[^>]+src="https?:\/\//.test(html) && !/<link[^>]+href="https?:\/\//.test(html), 'runtime external CSS/JS dependency detected');
 
 console.log(`ui-check: responsive invariants passed; CSS ${Buffer.byteLength(css)} B, app ${Buffer.byteLength(app)} B, total JS ${totalJs} B, 0 !important`);

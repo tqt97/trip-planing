@@ -1,14 +1,18 @@
-import { averageExpensePerPerson, totalExpenses } from '../../core.js';
+import { averageExpensePerPerson, paginateItems, totalExpenses } from '../../core.js';
 import { expenseCategoryIcon, expenseCategoryLabel, formatMoney } from '../../app/ui.js';
+import { renderCompactPagination } from '../common/pagination-view.js';
 
-export function renderExpenses(els, rawExpenses = [], peopleCount = 1) {
+export function renderExpenses(els, rawExpenses = [], peopleCount = 1, requestedPage = 1, pageSize = 8) {
   const expenses = [...rawExpenses].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   els.expenseTotal.textContent = formatMoney(totalExpenses(expenses));
   els.expenseCount.textContent = `${expenses.length} khoản`;
   if (els.expenseAverage) els.expenseAverage.textContent = formatMoney(averageExpensePerPerson(expenses, peopleCount));
   if (els.peopleCount && document.activeElement !== els.peopleCount) els.peopleCount.value = String(Math.max(1, Number(peopleCount) || 1));
+  const page = paginateItems(expenses, requestedPage, pageSize);
   els.expenseEmpty.hidden = expenses.length > 0;
-  els.expenseList.replaceChildren(...expenses.map(expenseRow));
+  els.expenseList.replaceChildren(...page.items.map(expenseRow));
+  renderCompactPagination({ pagination: els.expensePagination, pageNumbers: els.expensePageNumbers, pageSummary: els.expensePageSummary, prevButton: els.expensePrevPageBtn, nextButton: els.expenseNextPageBtn }, page);
+  return page;
 }
 
 function expenseRow(expense) {

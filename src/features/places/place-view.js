@@ -23,8 +23,9 @@ export function createPlaceRow(place, { currentUserId, votes = [] } = {}) {
 
 export function renderPagination(els, page) {
   const hasItems = page.totalItems > 0;
-  els.pagination.hidden = !hasItems;
-  if (!hasItems) { els.pageNumbers.replaceChildren(); els.pageSummary.textContent = ''; return; }
+  const needsPagination = hasItems && page.totalPages > 1;
+  els.pagination.hidden = !needsPagination;
+  if (!needsPagination) { els.pageNumbers.replaceChildren(); els.pageSummary.textContent = ''; return; }
   els.prevPageBtn.disabled = page.currentPage <= 1;
   els.nextPageBtn.disabled = page.currentPage >= page.totalPages;
   els.pageNumbers.replaceChildren(...visiblePageNumbers(page.currentPage, page.totalPages).map(number => {

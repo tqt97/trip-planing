@@ -7,7 +7,7 @@ import { renderRadarView } from '/src/app/radar-view.js';
 import { normalizeUiConfig, applyUiConfig } from '/src/config/ui-config.js';
 import { createPlaceRow, renderPagination } from '/src/features/places/place-view.js';
 import { renderRecommendations, renderClusters } from '/src/features/recommendations/recommendation-view.js';
-import { renderExpenses } from '/src/features/expenses/expense-view.js';
+import { createExpensePager } from '/src/features/expenses/expense-controller.js';
 import { createChecklistController } from '/src/features/checklists/checklist-controller.js';
 import { createAlbumController } from '/src/features/album/album-controller.js';
 import { fileToDataUrl, previewPlaceImage } from '/src/features/places/place-media.js';
@@ -42,6 +42,7 @@ const errorDetails = diagnostics.details;
 const appShell = createAppShell({ bootGate: $('#bootGate'), bootMessage: $('#bootMessage'), authGate: $('#authGate'), authMessage: $('#authMessage'), loginButton: $('#googleLoginBtn') });
 const checklistController = createChecklistController({ els, state, getRepository: () => repository, getCurrentUser: () => currentUser, getMembers: () => members, persistState, toast, trace, errorDetails });
 const albumController = createAlbumController({ els, state, getRepository: () => repository, getCurrentUser: () => currentUser, persistState, toast, trace, errorDetails });
+const expensePager = createExpensePager({ els, state, pageSize: 8 });
 
 await init();
 async function init() {
@@ -95,16 +96,15 @@ function bind() {
   $('#exportBtn').addEventListener('click', downloadState);
   $('#importInput').addEventListener('change', importFile);
   $('#addExpenseBtn').addEventListener('click', () => openExpenseDialog());
-  $('#addChecklistBtn')?.addEventListener('click', () => checklistController.open());
-  $('#addAlbumBtn')?.addEventListener('click', () => albumController.open());
+  $('#addChecklistBtn')?.addEventListener('click', () => checklistController.open()); $('#addAlbumBtn')?.addEventListener('click', () => albumController.open());
   document.querySelectorAll('.close-checklist').forEach((b) => b.addEventListener('click', () => els.checklistDialog.close()));
-  els.checklistForm?.addEventListener('submit', checklistController.save);
-  els.checklistList?.addEventListener('click', checklistController.action);
+  els.checklistForm?.addEventListener('submit', checklistController.save); els.checklistList?.addEventListener('click', checklistController.action);
   els.albumForm?.addEventListener('submit', albumController.save); els.albumList?.addEventListener('click', albumController.action);
-  els.albumFilter?.addEventListener('change', albumController.render);
+  els.albumFilter?.addEventListener('change', albumController.resetPage); els.albumPrevPageBtn?.addEventListener('click', () => albumController.changePage(Number(els.albumPageNumbers?.querySelector('[aria-current="page"]')?.dataset.page || 1) - 1));
+  els.albumNextPageBtn?.addEventListener('click', () => albumController.changePage(Number(els.albumPageNumbers?.querySelector('[aria-current="page"]')?.dataset.page || 1) + 1)); els.albumPageNumbers?.addEventListener('click', (event) => { const btn = event.target.closest('[data-page]'); if (btn) albumController.changePage(Number(btn.dataset.page)); });
+  expensePager.bind();
   document.querySelectorAll('.close-album').forEach((b)=>b.addEventListener('click',()=>els.albumDialog.close())); document.querySelectorAll('.close-album-lightbox').forEach((b)=>b.addEventListener('click',()=>els.albumLightbox.close()));
-  els.peopleCount?.addEventListener('change', onPeopleCountChange);
-  els.placeImage?.addEventListener('change', () => previewPlaceImage(els));
+  els.peopleCount?.addEventListener('change', onPeopleCountChange); els.placeImage?.addEventListener('change', () => previewPlaceImage(els));
   document.querySelectorAll('.close-expense').forEach((b) => b.addEventListener('click', () => els.expenseDialog.close()));
   document.querySelectorAll('.section-collapse-hit').forEach((header) => { header.addEventListener('click', toggleSectionFromHeader); header.addEventListener('keydown', toggleSectionFromHeader); });
   els.expenseForm.addEventListener('submit', saveExpense);
@@ -254,7 +254,7 @@ function render() {
   els.emptyState.hidden = filtered.length > 0;
   renderPagination(els, page);
   try { renderRadar(); } catch (error) { trace('error', 'RADAR_RENDER_FAILED', 'Không thể render radar vị trí.', errorDetails(error)); if (els.radarSummary) els.radarSummary.textContent = 'Radar tạm thời không hiển thị · mở Nhật ký để xem Trace.'; }
-  renderRecommendations(els.recommendations, state.places, votes, openGoogleMaps); renderClusters(els.clusters, state.places, openGoogleMaps); renderExpenses(els, state.expenses, state.tripSettings.peopleCount); checklistController.render(); albumController.render();
+  renderRecommendations(els.recommendations, state.places, votes, openGoogleMaps); renderClusters(els.clusters, state.places, openGoogleMaps); expensePager.render(); checklistController.render(); albumController.render();
 }
 
 function renderRadar() { renderRadarView({ els, state }); }
@@ -279,7 +279,7 @@ async function saveExpense(event){
     state.expenses ||= [];
     let saved=input;if(repository)saved=await repository.saveExpense(input);
     const idx=state.expenses.findIndex(x=>x.id===saved.id);if(idx>=0)state.expenses[idx]=saved;else state.expenses.push(saved);
-    persistState(state);renderExpenses(els, state.expenses, state.tripSettings.peopleCount);els.expenseDialog.close();trace('info',idx>=0?'EXPENSE_UPDATED':'EXPENSE_ADDED',`${input.payer} · ${formatMoney(input.amountVnd)}`);toast(idx>=0?'Đã cập nhật khoản chi.':'Đã lưu khoản chi.');
+    persistState(state);expensePager.reset();els.expenseDialog.close();trace('info',idx>=0?'EXPENSE_UPDATED':'EXPENSE_ADDED',`${input.payer} · ${formatMoney(input.amountVnd)}`);toast(idx>=0?'Đã cập nhật khoản chi.':'Đã lưu khoản chi.');
   } catch (error) {
     const id=trace('error','EXPENSE_SAVE_FAILED',error.message,errorDetails(error));
     els.expenseMessage.textContent=`Không lưu được khoản chi: ${error.message} · Trace ${id}`;
@@ -288,7 +288,7 @@ async function saveExpense(event){
   }
 }
 
-async function onExpenseAction(event){const btn=event.target.closest('[data-expense-action]');if(!btn)return;const row=btn.closest('[data-expense-id]');const expense=(state.expenses||[]).find(x=>x.id===row?.dataset.expenseId);if(!expense)return;if(btn.dataset.expenseAction==='edit'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');openExpenseDialog(expense)}if(btn.dataset.expenseAction==='delete'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');if(confirm(`Xóa khoản ${formatMoney(expense.amountVnd)} do ${expense.payer} chi?`)){if(repository)await repository.deleteExpense(expense.id);state.expenses=state.expenses.filter(x=>x.id!==expense.id);persistState(state);renderExpenses(els, state.expenses, state.tripSettings.peopleCount);trace('info','EXPENSE_DELETED',`${expense.payer} · ${formatMoney(expense.amountVnd)}`);toast('Đã xóa khoản chi.')}}}
+async function onExpenseAction(event){const btn=event.target.closest('[data-expense-action]');if(!btn)return;const row=btn.closest('[data-expense-id]');const expense=(state.expenses||[]).find(x=>x.id===row?.dataset.expenseId);if(!expense)return;if(btn.dataset.expenseAction==='edit'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');openExpenseDialog(expense)}if(btn.dataset.expenseAction==='delete'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');if(confirm(`Xóa khoản ${formatMoney(expense.amountVnd)} do ${expense.payer} chi?`)){if(repository)await repository.deleteExpense(expense.id);state.expenses=state.expenses.filter(x=>x.id!==expense.id);persistState(state);expensePager.render();trace('info','EXPENSE_DELETED',`${expense.payer} · ${formatMoney(expense.amountVnd)}`);toast('Đã xóa khoản chi.')}}}
 
 
 function openPlaceDialog(place=null){els.placeForm.reset();els.placeMessage.textContent='';els.placeId.value=place?.id||'';els.placeDialogTitle.textContent=place?'Sửa địa điểm':'Thêm địa điểm';const coordsDetails=$('#placeCoordsDetails');if(coordsDetails)coordsDetails.open=window.matchMedia('(max-width: 820px)').matches;els.placeImagePreview.hidden=true;els.placeImagePreview.removeAttribute('src');if(place){els.placeName.value=place.name;els.placeAddress.value=place.address;els.placeCategory.value=place.category;els.placePriority.value=place.priority;els.placeNote.value=place.note;els.placeNoteUrl.value=place.noteUrl||'';els.placeLat.value=place.lat??'';els.placeLng.value=place.lng??'';if(place.imageUrl){els.placeImagePreview.src=place.imageUrl;els.placeImagePreview.hidden=false;}}els.placeDialog.showModal();setTimeout(()=>els.placeName.focus(),50)}
@@ -369,10 +369,10 @@ async function importFile(event){const file=event.target.files?.[0];if(!file)ret
 async function onPeopleCountChange(){
   const next=sanitizeTripSettings({peopleCount:els.peopleCount.value});
   const previous=state.tripSettings.peopleCount;
-  state.tripSettings=next; renderExpenses(els,state.expenses,next.peopleCount); persistState(state);
+  state.tripSettings=next; expensePager.render(); persistState(state);
   if(repository){
-    if(!canEditShared()){state.tripSettings.peopleCount=previous;renderExpenses(els,state.expenses,previous);toast('Viewer không thể đổi số người.');return}
-    try{await repository.updatePeopleCount(next.peopleCount);toast(`Đã đặt ${next.peopleCount} người để chia chi phí.`)}catch(error){state.tripSettings.peopleCount=previous;renderExpenses(els,state.expenses,previous);toast(`Không lưu được số người: ${error.message}`)}
+    if(!canEditShared()){state.tripSettings.peopleCount=previous;expensePager.render();toast('Viewer không thể đổi số người.');return}
+    try{await repository.updatePeopleCount(next.peopleCount);toast(`Đã đặt ${next.peopleCount} người để chia chi phí.`)}catch(error){state.tripSettings.peopleCount=previous;expensePager.render();toast(`Không lưu được số người: ${error.message}`)}
   }
 }
 
