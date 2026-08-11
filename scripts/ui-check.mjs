@@ -19,7 +19,12 @@ assert((css.match(/!important/g)||[]).length === 0, 'CSS must not use !important
 assert(has(/body\s*\{[^}]*overflow-x:\s*clip/s), 'body horizontal overflow guard missing');
 assert(html.includes('class="brand-title"') && html.includes('class="subtitle"') && !html.includes('trip-logo'), 'brand hierarchy must be explicit and logo-free');
 assert(css.includes('@media (max-width: 820px)') && css.includes('@media (max-width: 480px)') && css.includes('@media (max-width: 360px)'), 'mobile breakpoints missing');
-assert(has(/dialog\s*\{[^}]*width:\s*100vw[^}]*max-width:\s*100vw[^}]*max-height:\s*92dvh/s), 'mobile dialog viewport guard missing');
+assert(has(/dialog\s*\{[^}]*width:\s*100%[^}]*max-width:\s*100dvw[^}]*max-height:\s*92dvh/s), 'mobile dialog viewport guard missing');
+
+assert(html.includes('id="placeCoordsDetails"'), 'coordinates details id missing');
+assert(main.includes("coordsDetails.open=window.matchMedia('(max-width: 820px)').matches"), 'mobile coordinates must default open');
+assert(has(/dialog form,\.trace-panel,\.members-panel\{[^}]*background:/s), 'members modal must use the same solid dialog surface');
+assert(has(/@media\s*\(min-width:\s*821px\)\s*\{[\s\S]*?content-visibility:\s*auto/s), 'content-visibility must be desktop-only to avoid mobile layout shifts');
 assert(has(/\.shell\s*\{[^}]*width:\s*min\(calc\(100% - 48px\)/s) && has(/@media\s*\(max-width:\s*360px\)[\s\S]*?\.shell\s*\{[^}]*width:\s*calc\(100% - 14px\)/s), 'shell viewport gutters missing');
 assert(has(/\.places-list\s*\{[^}]*max-height:\s*520px[^}]*overflow:\s*auto/s), 'mobile places bounded scroll missing');
 assert(has(/\.expense-list\s*\{[^}]*max-height:\s*430px[^}]*overflow:\s*auto/s), 'mobile expenses bounded scroll missing');

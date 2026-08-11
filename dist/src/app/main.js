@@ -1,4 +1,6 @@
 import { calibrateDurationSeconds, estimateDurationSeconds, estimateRoadMeters, exportState, filterAndSortPlaces, googleMapsCoordinateUrl, haversineMeters, importState, paginateItems, parseGoogleMapsCoordinates, hasUserVoted, sanitizeExpense, sanitizeHome, sanitizePlace, uid, validateExpense, validatePlace } from '/src/core.js';
+import { SupabaseHttpClient } from '/src/data/supabase-client.js';
+import { CollaborativeRepository } from '/src/data/repository.js';
 import { loadState, loadTraces, loadUiPrefs, MAX_TRACES, normalizePageSize, persistState, saveTraces as persistTraces, saveUiPrefs as persistUiPrefs } from '/src/app/storage.js';
 import { $, collectElements, createToast, formatDistance, formatMoney, placeCategoryLabel, sameCoords, setBusy, validCoords } from '/src/app/ui.js';
 import { renderRadarView } from '/src/app/radar-view.js';
@@ -18,6 +20,7 @@ let uiConfig = normalizeUiConfig();
 let currentPage = 1;
 let routingConfigured = false;
 let dataConfig = { provider: 'localStorage' };
+let collaborationConfig = null;
 let collaborationClient = null;
 let repository = null;
 let currentUser = null;
@@ -40,7 +43,7 @@ async function init() {
   els.pageSize.value = String(uiPrefs.pageSize);
   syncPlaceFiltersForViewport();
   trace('info', 'APP_BOOT', 'Ứng dụng khởi động.', { viewport: `${window.innerWidth}x${window.innerHeight}`, pageSize: uiPrefs.pageSize, uiTitle: uiConfig.title });
-  if (dataConfig.provider === 'firebase') {
+  if (dataConfig.provider === 'supabase') {
     appShell.boot('Đang kiểm tra phiên Google và đồng bộ dữ liệu nhóm…');
     const ready = await initCollaboration();
     if (!ready) return;
@@ -54,7 +57,7 @@ async function init() {
   trace('info', 'APP_READY', `Ứng dụng sẵn sàng sau ${Math.round(performance.now() - APP_STARTED_AT)}ms.`, { bootMs: Math.round(performance.now() - APP_STARTED_AT), collaborative: Boolean(repository) });
 }
 function bind() {
-  $('#googleLoginBtn')?.addEventListener('click', () => { if (!collaborationClient) return; appShell.setLoginBusy(true); collaborationClient.signInWithGoogle().then((result) => { if (result?.signedIn) location.reload(); }).catch((error) => { appShell.setLoginBusy(false); trace('error','FIREBASE_LOGIN_FAILED',error.message,errorDetails(error)); }); });
+  $('#googleLoginBtn')?.addEventListener('click', () => { if (!collaborationClient) return; appShell.setLoginBusy(true); try { collaborationClient.signInWithGoogle(`${location.origin}/`); } catch (error) { appShell.setLoginBusy(false); trace('error','SUPABASE_LOGIN_FAILED',error.message,errorDetails(error)); } });
   $('#userBtn')?.addEventListener('click', signOutUser);
   $('#membersBtn')?.addEventListener('click', openMembersDialog);
   $('#mobileMembersBtn')?.addEventListener('click', openMembersDialog);
@@ -110,6 +113,7 @@ async function loadFixedHome() {
     const payload = await res.json();
     routingConfigured = Boolean(payload?.routingConfigured);
     dataConfig = payload?.data || { provider: 'localStorage' };
+    collaborationConfig = payload?.collaboration || null;
     uiConfig = applyUiConfig(payload?.ui || uiConfig);
     if (!uiPrefs.hasStoredPageSize) uiPrefs = loadUiPrefs({ pageSize: uiConfig.defaultPageSize });
     if (payload?.home && validCoords(payload.home)) {
@@ -140,21 +144,30 @@ function applyConfiguredUiDefaults() {
 
 
 async function initCollaboration() {
-  const firebase = dataConfig?.firebase;
-  if (!firebase?.configured) { appShell.auth('Firebase production chưa được cấu hình đầy đủ. Kiểm tra FIREBASE_* trên Vercel.'); trace('error','FIREBASE_CONFIG_MISSING','APP_ENV=prod nhưng thiếu Firebase web config.'); return false; }
-  const [{ FirebaseClient }, { FirebaseTripRepository }] = await Promise.all([import('/src/data/firebase-client.js'),import('/src/data/firebase-repository.js')]);
-  collaborationClient = new FirebaseClient(firebase);
-  repository = new FirebaseTripRepository(collaborationClient,{tripSlug:dataConfig.defaultTripSlug||'dalat-2026',tripName:dataConfig.defaultTripName||'Đà Lạt 2026',home:state.home});
+  if (!collaborationConfig?.configured) { appShell.auth('Supabase production chưa được cấu hình đầy đủ. Kiểm tra SUPABASE_URL và SUPABASE_PUBLISHABLE_KEY trên Vercel.'); trace('error','SUPABASE_CONFIG_MISSING','APP_ENV=prod nhưng thiếu Supabase config.'); return false; }
+  collaborationClient = new SupabaseHttpClient({ url: collaborationConfig.supabaseUrl, key: collaborationConfig.publishableKey });
+  repository = new CollaborativeRepository(collaborationClient, collaborationConfig.defaultTripSlug || 'dalat-2026');
   try {
     const connection = await repository.connect();
-    if (!connection) { appShell.setLoginBusy(false); appShell.auth('Đăng nhập Google để tham gia Trip dùng chung trên Firebase.'); return false; }
-    currentUser=connection.user; appShell.boot('Đã đăng nhập · đang tải địa điểm, vote và chi tiêu…');
-    await reloadCollaborativeData('initial',false); await seedFirebaseDefaultsIfNeeded(); updateAccountUi();
-    repository.subscribe((event)=>{if(event?.error)trace('warn','FIREBASE_REALTIME_ERROR',event.error.message,errorDetails(event.error));scheduleRealtimeReload();});
-    trace('info','COLLAB_CONNECTED',`Đã kết nối Firebase Trip ${dataConfig.defaultTripSlug}.`,{role:repository.role,userId:currentUser.id}); return true;
-  } catch(error) { appShell.setLoginBusy(false); appShell.auth(`Không kết nối được dữ liệu dùng chung: ${error.message}`); trace('error','COLLAB_CONNECT_FAILED',error.message,errorDetails(error)); return false; }
+    if (!connection) {
+      appShell.setLoginBusy(false);
+      appShell.auth('Đăng nhập để tham gia Trip dùng chung.');
+      return false;
+    }
+    currentUser = connection.user;
+    appShell.boot('Đã đăng nhập · đang tải địa điểm, vote và chi tiêu…');
+    await reloadCollaborativeData('initial', false);
+    updateAccountUi();
+    repository.subscribe(() => scheduleRealtimeReload());
+    trace('info','COLLAB_CONNECTED',`Đã kết nối Trip ${collaborationConfig.defaultTripSlug}.`,{role:repository.role,userId:currentUser.id});
+    return true;
+  } catch (error) {
+    appShell.setLoginBusy(false);
+    appShell.auth(`Không kết nối được dữ liệu dùng chung: ${error.message}`);
+    trace('error','COLLAB_CONNECT_FAILED',error.message,errorDetails(error));
+    return false;
+  }
 }
-async function seedFirebaseDefaultsIfNeeded(){if(!repository||repository.role!=='owner'||state.places.length||dataConfig?.firebase?.autoSeedDefaults===false)return;try{const response=await fetch('/data/default-places.json',{cache:'no-store'});if(!response.ok)return;const payload=await response.json();const defaults=Array.isArray(payload)?payload:payload?.places;if(!Array.isArray(defaults)||!defaults.length)return;for(const raw of defaults){const place=sanitizePlace({...raw,id:raw.id||raw.seedKey||crypto.randomUUID(),source:raw.source||'default-seed'});if(!validCoords(place))continue;if(validCoords(state.home))applyFallbackDistance(place);await repository.savePlace(place)}await reloadCollaborativeData('default-seed',false);trace('info','FIREBASE_DEFAULT_SEED',`Đã seed ${state.places.length} địa điểm mặc định.`)}catch(error){trace('warn','FIREBASE_DEFAULT_SEED_FAILED',error.message,errorDetails(error))}}
 
 async function reloadCollaborativeData(reason='realtime', renderUi=true) {
   if (!repository) return;
@@ -172,10 +185,10 @@ async function reloadCollaborativeData(reason='realtime', renderUi=true) {
   if (renderUi) render();
   if (reason !== 'initial') trace('info','REALTIME_SYNC','Đã đồng bộ thay đổi từ nhóm.',{reason});
 }
-function scheduleRealtimeReload(){clearTimeout(realtimeReloadTimer);realtimeReloadTimer=setTimeout(()=>reloadCollaborativeData('firebase-change').catch(error=>trace('warn','REALTIME_RELOAD_FAILED',error.message,errorDetails(error))),220)}
-function updateAccountUi(){const name=currentUser?.user_metadata?.full_name||currentUser?.user_metadata?.name||currentUser?.email||'Tài khoản';if($('#userBtn'))$('#userBtn').textContent=`${name} · ${repository?.role||''}`;if($('#membersBtn'))$('#membersBtn').hidden=!repository;const editable=canEditShared();['#addBtn','#mobileAddBtn','#addExpenseBtn'].forEach(sel=>{const el=$(sel);if(el){el.disabled=!editable;el.title=editable?'':'Bạn đang ở quyền viewer';}})}
-async function signOutUser(){if(!collaborationClient)return;if(!confirm('Đăng xuất khỏi Trip?'))return;await collaborationClient.signOut();location.reload()}
+function scheduleRealtimeReload(){clearTimeout(realtimeReloadTimer);realtimeReloadTimer=setTimeout(()=>reloadCollaborativeData('postgres-change').catch(error=>trace('warn','REALTIME_RELOAD_FAILED',error.message,errorDetails(error))),280)}
+function updateAccountUi(){const name=currentUser?.user_metadata?.full_name||currentUser?.user_metadata?.name||currentUser?.email||'Tài khoản';if($('#userBtn')){$('#userBtn').hidden=false;$('#userBtn').textContent=`${name} · ${repository?.role||''}`;}if($('#membersBtn'))$('#membersBtn').hidden=!repository;if($('#mobileMembersBtn'))$('#mobileMembersBtn').hidden=!repository;const editable=canEditShared();['#addBtn','#mobileAddBtn','#addExpenseBtn'].forEach(sel=>{const el=$(sel);if(el){el.disabled=!editable;el.title=editable?'':'Bạn đang ở quyền viewer';}})}
 function updateLocalModeUi(){if($('#userBtn'))$('#userBtn').hidden=true;if($('#membersBtn'))$('#membersBtn').hidden=true;if($('#mobileMembersBtn'))$('#mobileMembersBtn').hidden=true;trace('info','DATA_PROVIDER_LOCAL','Đang dùng localStorage trên thiết bị này.');}
+async function signOutUser(){if(!collaborationClient)return;if(!confirm('Đăng xuất khỏi Trip?'))return;await collaborationClient.signOut();location.reload()}
 function openMembersDialog(){renderMembers();$('#membersDialog')?.showModal()}
 function renderMembers(){const list=$('#membersList');if(!list)return;$('#memberRoleInfo').textContent=`Bạn đang là ${repository?.role||'—'} · ${members.length} thành viên.`;renderMemberList(list,members,{currentUserId:currentUser?.id,role:repository?.role})}
 async function onMemberRoleChange(event){const select=event.target.closest('[data-member-id]');if(!select||!repository)return;try{await repository.updateMemberRole(select.dataset.memberId,select.value);toast('Đã cập nhật quyền thành viên.');await reloadCollaborativeData('member-role')}catch(error){toast(`Không đổi được quyền: ${error.message}`);await reloadCollaborativeData('member-role-failed')}}
@@ -255,8 +268,8 @@ async function saveExpense(event){
 async function onExpenseAction(event){const btn=event.target.closest('[data-expense-action]');if(!btn)return;const row=btn.closest('[data-expense-id]');const expense=(state.expenses||[]).find(x=>x.id===row?.dataset.expenseId);if(!expense)return;if(btn.dataset.expenseAction==='edit'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');openExpenseDialog(expense)}if(btn.dataset.expenseAction==='delete'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');if(confirm(`Xóa khoản ${formatMoney(expense.amountVnd)} do ${expense.payer} chi?`)){if(repository)await repository.deleteExpense(expense.id);state.expenses=state.expenses.filter(x=>x.id!==expense.id);persistState(state);renderExpenses(els, state.expenses);trace('info','EXPENSE_DELETED',`${expense.payer} · ${formatMoney(expense.amountVnd)}`);toast('Đã xóa khoản chi.')}}}
 
 
-function openPlaceDialog(place=null){els.placeForm.reset();els.placeMessage.textContent='';els.placeId.value=place?.id||'';els.placeDialogTitle.textContent=place?'Sửa địa điểm':'Thêm địa điểm';if(place){els.placeName.value=place.name;els.placeAddress.value=place.address;els.placeCategory.value=place.category;els.placePriority.value=place.priority;els.placeNote.value=place.note;els.placeLat.value=place.lat??'';els.placeLng.value=place.lng??'';}els.placeDialog.showModal();setTimeout(()=>els.placeName.focus(),50)}
-function openHomeDialog(){els.homeMessage.textContent=repository?'Home đang lấy từ Trip dùng chung trên Firebase.':(validCoords(state.home)?'Để đổi Home, sửa .env.local rồi restart server.':'Home chưa được cấu hình trong environment.');els.homeAddress.value=state.home.address||'';els.homeLat.value=state.home.lat??'';els.homeLng.value=state.home.lng??'';els.homeDialog.showModal()}
+function openPlaceDialog(place=null){els.placeForm.reset();els.placeMessage.textContent='';els.placeId.value=place?.id||'';els.placeDialogTitle.textContent=place?'Sửa địa điểm':'Thêm địa điểm';const coordsDetails=$('#placeCoordsDetails');if(coordsDetails)coordsDetails.open=window.matchMedia('(max-width: 820px)').matches;if(place){els.placeName.value=place.name;els.placeAddress.value=place.address;els.placeCategory.value=place.category;els.placePriority.value=place.priority;els.placeNote.value=place.note;els.placeLat.value=place.lat??'';els.placeLng.value=place.lng??'';}els.placeDialog.showModal();setTimeout(()=>els.placeName.focus(),50)}
+function openHomeDialog(){els.homeMessage.textContent=repository?'Home đang lấy từ Trip dùng chung trên Supabase. Chỉnh seed/DB rồi đồng bộ lại nếu cần.':(validCoords(state.home)?'Để đổi Home, sửa .env.local rồi restart server.':'Home chưa được cấu hình trong environment.');els.homeAddress.value=state.home.address||'';els.homeLat.value=state.home.lat??'';els.homeLng.value=state.home.lng??'';els.homeDialog.showModal()}
 function fillCoordsFromMapsUrl(){const coords=parseGoogleMapsCoordinates(els.placeMapsUrl.value);if(!coords)return;els.placeLat.value=coords.lat;els.placeLng.value=coords.lng;els.placeMessage.textContent=`✓ Đã lấy tọa độ ${coords.lat}, ${coords.lng}`}
 
 async function savePlace(event){

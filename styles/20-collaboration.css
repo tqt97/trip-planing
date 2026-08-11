@@ -32,8 +32,12 @@
   white-space: nowrap;
 }
 
+.members-dialog {
+  width: min(620px, calc(100vw - 32px));
+}
 .members-panel {
-  width: min(620px, calc(100vw - 24px));
+  width: 100%;
+  min-width: 0;
   max-height: min(78dvh, 720px);
   overflow: auto;
 }
@@ -182,8 +186,12 @@ body.app-auth-required .back-to-top {
 
 @media (max-width: 820px) {
   .auth-card { padding: 22px 18px; }
+  .members-dialog {
+    width: 100%;
+    max-width: 100dvw;
+  }
   .members-panel {
-    width: calc(100vw - 20px);
+    width: 100%;
     max-height: 82dvh;
   }
   .member-row { grid-template-columns: minmax(0, 1fr) 88px; }
@@ -210,13 +218,15 @@ body.app-auth-required .back-to-top {
   .boot-spinner { animation-duration: 1.6s; }
 }
 
-@supports (content-visibility: auto) {
-  .radar-card,
-  .recommend-card,
-  .places-section,
-  .expense-card,
-  .cluster-card {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 520px;
+@media (min-width: 821px) {
+  @supports (content-visibility: auto) {
+    .radar-card,
+    .recommend-card,
+    .places-section,
+    .expense-card,
+    .cluster-card {
+      content-visibility: auto;
+      contain-intrinsic-size: auto 520px;
+    }
   }
 }

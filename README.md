@@ -1,4 +1,4 @@
-# Đà Lạt Nearby Planner v2.5.0
+# Đà Lạt Nearby Planner v2.5.1
 
 Mobile-first trip planner với hai data mode rõ ràng:
 
@@ -60,6 +60,14 @@ npm run db:seed
 ```
 
 Không đưa `SUPABASE_SECRET_KEY`/service-role key lên frontend hoặc Vercel runtime của app.
+
+
+## v2.5.1 UI hotfix
+
+- Modal **Nhóm** dùng cùng surface/khung với các form khác ở desktop và mobile.
+- `Tọa độ` trong form thêm địa điểm mặc định mở trên mobile (<=820px).
+- `content-visibility` chỉ còn bật trên desktop để tránh layout shift khi vừa mở app trên điện thoại.
+- Mobile dialog dùng `100dvw` guard và members panel có width/padding/background ổn định.
 
 ## Quality
 

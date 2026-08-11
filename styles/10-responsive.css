@@ -212,14 +212,15 @@
   }
 
   dialog {
-    width: 100vw;
-    max-width: 100vw;
+    width: 100%;
+    max-width: 100dvw;
     max-height: 92dvh;
     margin: auto 0 0;
     border-radius: 22px 22px 0 0;
   }
   dialog form,
-  .trace-panel {
+  .trace-panel,
+  .members-panel {
     max-height: 92dvh;
     padding: 16px max(16px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     border-radius: 22px 22px 0 0;
