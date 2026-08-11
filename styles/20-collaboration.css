@@ -1,4 +1,3 @@
-/* Collaboration/auth UI. Kept separate from layout so shared-mode changes stay isolated. */
 .auth-gate {
   position: fixed;
   inset: 0;
@@ -111,7 +110,6 @@
   font-weight: 800;
 }
 
-/* Prevent protected content from flashing before session resolution. */
 body.app-booting .topbar,
 body.app-booting .shell,
 body.app-booting .mobile-nav,

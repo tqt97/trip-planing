@@ -1,74 +1,65 @@
-# Đà Lạt Nearby Planner v2.4.3
+# Đà Lạt Nearby Planner v2.5.0
 
-Planner mobile-first cho chuyến Đà Lạt: Places, radar quanh Home, vote, Top 6 gợi ý, gom điểm gần nhau, Expenses và Google Maps links.
-
-## Điểm mới v2.4
-
-Một source code, hai data provider theo môi trường:
+Mobile-first trip planner với hai data mode rõ ràng:
 
 ```text
-APP_ENV=local  -> localStorage, offline, không login, không tải Firebase SDK
-APP_ENV=prod   -> Firebase Authentication + Cloud Firestore realtime
+APP_ENV=local -> localStorage, không login
+APP_ENV=prod  -> Supabase Auth + Postgres/RLS + Realtime
 ```
 
-Business/UI dùng chung; Firebase được lazy-load chỉ khi production provider được chọn.
-
-## Chạy local nhanh
+## Local
 
 ```bash
 npm install
 cp .env.example .env.local
-# giữ APP_ENV=local
 npm run dev
 ```
 
-Mở `http://127.0.0.1:3000`.
+`.env.local`:
 
-Local mode lưu Places + Expenses trong browser localStorage như v1. Không cần Firebase và không cần Google login.
+```env
+APP_ENV=local
+HOME_NAME=Hotel Trường An Hotel
+HOME_LAT=11.9370985
+HOME_LNG=108.4220004
+```
 
-## Production Firebase
-
-Đọc [`docs/DEPLOY_FIREBASE_VERCEL_VI.md`](docs/DEPLOY_FIREBASE_VERCEL_VI.md).
-
-Các biến chính:
+## Production / Vercel
 
 ```env
 APP_ENV=prod
-FIREBASE_API_KEY=...
-FIREBASE_AUTH_DOMAIN=YOUR_PROJECT.firebaseapp.com
-FIREBASE_PROJECT_ID=YOUR_PROJECT
-FIREBASE_APP_ID=...
-FIREBASE_MESSAGING_SENDER_ID=...
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
 DEFAULT_TRIP_SLUG=dalat-2026
-DEFAULT_TRIP_NAME=Đà Lạt 2026
 ```
 
-Deploy Firestore Rules trước khi chia sẻ app:
+Đọc [docs/DEPLOY_VERCEL_SUPABASE_GOOGLE_VI.md](docs/DEPLOY_VERCEL_SUPABASE_GOOGLE_VI.md).
 
-```bash
-npm install -g firebase-tools
-firebase login
-firebase use YOUR_PROJECT_ID
-firebase deploy --only firestore:rules,firestore:indexes
-```
+## Database clean setup
+
+- `supabase/RESET_ALL.sql`: xóa schema app cũ.
+- `supabase/migrations/001_v2_collaboration.sql`: schema + RLS + RPC + Realtime.
+- `supabase/002_seed_default_trip.sql`: tạo Trip `dalat-2026`.
+- `supabase/RESET_MIGRATE_SEED.sql`: reset + migrate + seed một lần.
+
+RPC join đã dùng table alias đầy đủ để tránh lỗi PostgreSQL `column reference "trip_id" is ambiguous`.
 
 ## Default places
 
-Chỉnh `data/default-places.json`. Khi Trip Firebase lần đầu được tạo và Places đang trống, owner đầu tiên sẽ tự seed danh sách này nếu `FIREBASE_AUTO_SEED_DEFAULTS=true`.
+Chỉnh `data/default-places.json`. Nếu muốn seed data thật vào Supabase bằng script admin local:
 
-## Cấu trúc
-
-```text
-api/                         Vercel functions: config + ORS route/matrix
-data/default-places.json     dữ liệu địa điểm mặc định
-firebase/                    Firestore rules/indexes
-src/app/                     orchestration, shell, storage, radar, UI helpers
-src/config/                  UI config normalization
-src/data/                    Firebase lazy client + Firebase repository
-src/features/                Places / recommendations / expenses / members / diagnostics
-styles/                      foundation / responsive / collaboration layers
-tests/                       unit/API/repository/Firestore rule contracts
+```env
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_xxx
 ```
+
+rồi:
+
+```bash
+npm run db:seed
+```
+
+Không đưa `SUPABASE_SECRET_KEY`/service-role key lên frontend hoặc Vercel runtime của app.
 
 ## Quality
 
@@ -76,6 +67,4 @@ tests/                       unit/API/repository/Firestore rule contracts
 npm run quality
 ```
 
-Chạy lint/security, 31 tests, responsive UI gate, performance budget, build, smoke và 2.000 monkey mutations.
-
-Chi tiết: [`docs/QUALITY_REPORT.md`](docs/QUALITY_REPORT.md).
+Chạy lint/security, unit/API/RLS tests, UI gate, performance budget, build, smoke và monkey tests.

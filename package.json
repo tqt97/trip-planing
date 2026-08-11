@@ -1,6 +1,6 @@
 {
   "name": "dalat-nearby-planner",
-  "version": "2.4.3",
+  "version": "2.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,7 +12,8 @@
     "quality": "npm run lint && npm test && npm run ui && npm run perf && npm run build && npm run smoke && npm run monkey",
     "dev": "node scripts/dev.mjs",
     "ui": "node scripts/ui-check.mjs",
-    "perf": "node scripts/perf-check.mjs"
+    "perf": "node scripts/perf-check.mjs",
+    "db:seed": "node scripts/db-seed.mjs"
   },
   "engines": {
     "node": ">=20"

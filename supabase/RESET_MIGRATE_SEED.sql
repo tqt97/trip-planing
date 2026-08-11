@@ -1,3 +1,34 @@
+-- DALAT NEARBY PLANNER v2.3 - ONE SHOT CLEAN REBUILD
+-- WARNING: deletes all app data in public tables. Auth users are preserved.
+
+-- DALAT NEARBY PLANNER v2.3 - RESET SHARED APP SCHEMA
+-- WARNING: This deletes all app data in public.* tables below.
+-- It does NOT delete Supabase Auth users in auth.users.
+
+begin;
+
+-- Remove auth trigger first so it cannot point at a dropped function.
+drop trigger if exists on_auth_user_created on auth.users;
+
+-- Drop app tables. CASCADE removes policies, FK dependencies and publication memberships.
+drop table if exists public.place_votes cascade;
+drop table if exists public.expenses cascade;
+drop table if exists public.places cascade;
+drop table if exists public.trip_members cascade;
+drop table if exists public.trips cascade;
+drop table if exists public.profiles cascade;
+
+-- Drop helper/RPC functions explicitly for a clean rebuild.
+drop function if exists public.join_trip_by_slug(text) cascade;
+drop function if exists public.is_trip_member(uuid) cascade;
+drop function if exists public.trip_role(uuid) cascade;
+drop function if exists public.can_edit_trip(uuid) cascade;
+drop function if exists public.shares_trip_with(uuid) cascade;
+drop function if exists public.handle_new_user() cascade;
+drop function if exists public.touch_updated_at() cascade;
+
+commit;
+
 -- DALAT NEARBY PLANNER v2.3 - CLEAN COLLABORATION SCHEMA
 -- Run after supabase/RESET_ALL.sql when rebuilding from scratch.
 
@@ -456,3 +487,28 @@ end;
 $$;
 
 commit;
+
+-- Default shared Trip. Edit these values if your Vercel DEFAULT_TRIP_SLUG/Home differs.
+insert into public.trips (
+  slug,
+  name,
+  home_name,
+  home_lat,
+  home_lng,
+  public_join
+)
+values (
+  'dalat-2026',
+  'Đà Lạt 2026',
+  'Hotel Trường An Hotel',
+  11.9370985,
+  108.4220004,
+  true
+)
+on conflict (slug) do update
+set name = excluded.name,
+    home_name = excluded.home_name,
+    home_lat = excluded.home_lat,
+    home_lng = excluded.home_lng,
+    public_join = excluded.public_join,
+    updated_at = now();

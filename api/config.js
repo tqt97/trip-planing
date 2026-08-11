@@ -2,21 +2,27 @@ import { json } from './_shared.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') { res.setHeader('Allow', 'GET'); return json(res, 405, { error: 'Method not allowed' }); }
+
+  const rawEnv = String(process.env.APP_ENV || 'local').trim().toLowerCase();
+  const appEnv = rawEnv === 'prod' ? 'prod' : 'local';
   const lat = Number(process.env.HOME_LAT);
   const lng = Number(process.env.HOME_LNG);
   const configuredHome = Number.isFinite(lat) && lat >= -90 && lat <= 90 && Number.isFinite(lng) && lng >= -180 && lng <= 180;
-  const appEnv = normalizeAppEnv(process.env.APP_ENV);
-  const firebase = firebaseConfig();
+  const supabaseUrl = String(process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  const publishableKey = String(process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '').trim();
+  const collaboration = {
+    configured: appEnv === 'prod' && Boolean(supabaseUrl && publishableKey),
+    supabaseUrl: appEnv === 'prod' ? supabaseUrl : '',
+    publishableKey: appEnv === 'prod' ? publishableKey : '',
+    defaultTripSlug: envText('DEFAULT_TRIP_SLUG', 'dalat-2026', 80)
+  };
+
   return json(res, 200, {
     appEnv,
     home: configuredHome ? { address: envText('HOME_NAME', 'Home', 300), lat, lng, source: 'environment' } : null,
     routingConfigured: Boolean(process.env.OPENROUTESERVICE_API_KEY),
-    data: {
-      provider: appEnv === 'prod' ? 'firebase' : 'localStorage',
-      defaultTripSlug: envText('DEFAULT_TRIP_SLUG', 'dalat-2026', 80),
-      defaultTripName: envText('DEFAULT_TRIP_NAME', 'Đà Lạt 2026', 120),
-      firebase: appEnv === 'prod' ? firebase : null
-    },
+    data: { provider: appEnv === 'prod' ? 'supabase' : 'localStorage' },
+    collaboration,
     ui: {
       eyebrow: envText('UI_EYEBROW', 'ĐÀ LẠT · TRIP COMPANION', 80),
       title: envText('UI_TITLE', 'Ní ơi, mình đi đâu thế.', 100),
@@ -30,17 +36,6 @@ export default async function handler(req, res) {
     }
   });
 }
-function normalizeAppEnv(value) { return String(value || 'local').trim().toLowerCase() === 'prod' ? 'prod' : 'local'; }
+
 function envText(name, fallback, max) { const value = String(process.env[name] || '').trim(); return (value || fallback).slice(0, max); }
 function envNumber(name, fallback) { const value = Number(process.env[name]); return Number.isFinite(value) ? value : fallback; }
-function firebaseConfig() {
-  const config = {
-    apiKey: envText('FIREBASE_API_KEY', '', 256),
-    authDomain: envText('FIREBASE_AUTH_DOMAIN', '', 256),
-    projectId: envText('FIREBASE_PROJECT_ID', '', 128),
-    appId: envText('FIREBASE_APP_ID', '', 256),
-    messagingSenderId: envText('FIREBASE_MESSAGING_SENDER_ID', '', 128),
-    storageBucket: envText('FIREBASE_STORAGE_BUCKET', '', 256)
-  };
-  return { configured: Boolean(config.apiKey && config.authDomain && config.projectId && config.appId), sdkVersion: '12.16.0', autoSeedDefaults: String(process.env.FIREBASE_AUTO_SEED_DEFAULTS || 'true').toLowerCase() !== 'false', ...config };
-}

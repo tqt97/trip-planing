@@ -108,12 +108,24 @@ test('config exposes only fixed Home and routing availability, never the ORS key
   }
 });
 
-test('config switches prod to Firebase and exposes web config', async () => {
-  const keys=['APP_ENV','FIREBASE_API_KEY','FIREBASE_AUTH_DOMAIN','FIREBASE_PROJECT_ID','FIREBASE_APP_ID','DEFAULT_TRIP_SLUG'];const old=Object.fromEntries(keys.map(k=>[k,process.env[k]]));Object.assign(process.env,{APP_ENV:'prod',FIREBASE_API_KEY:'public-web-key',FIREBASE_AUTH_DOMAIN:'trip.firebaseapp.com',FIREBASE_PROJECT_ID:'trip-project',FIREBASE_APP_ID:'1:123:web:abc',DEFAULT_TRIP_SLUG:'dalat-2026'});
-  try{const res=response();await configHandler({method:'GET'},res);await res.done;const p=JSON.parse(res.body);assert.equal(p.appEnv,'prod');assert.equal(p.data.provider,'firebase');assert.equal(p.data.firebase.configured,true);assert.equal(p.data.firebase.projectId,'trip-project');assert.equal(p.data.defaultTripSlug,'dalat-2026');}finally{for(const k of keys)old[k]===undefined?delete process.env[k]:process.env[k]=old[k];}
+test('config exposes Supabase publishable config but never service-role secret', async () => {
+  const old = { env:process.env.APP_ENV,url:process.env.SUPABASE_URL,pub:process.env.SUPABASE_PUBLISHABLE_KEY,service:process.env.SUPABASE_SERVICE_ROLE_KEY,slug:process.env.DEFAULT_TRIP_SLUG };
+  process.env.APP_ENV='prod';
+  process.env.SUPABASE_URL='https://example.supabase.co';
+  process.env.SUPABASE_PUBLISHABLE_KEY='sb_publishable_public_test';
+  process.env.SUPABASE_SERVICE_ROLE_KEY=['super','secret','service'].join('-');
+  process.env.DEFAULT_TRIP_SLUG='dalat-2026';
+  try {
+    const res=response(); await configHandler({method:'GET'},res); await res.done; const payload=JSON.parse(res.body);
+    assert.equal(payload.collaboration.configured,true);
+    assert.equal(payload.collaboration.supabaseUrl,'https://example.supabase.co');
+    assert.equal(payload.collaboration.publishableKey,'sb_publishable_public_test');
+    assert.equal(payload.collaboration.defaultTripSlug,'dalat-2026');
+    assert.equal(res.body.includes(process.env.SUPABASE_SERVICE_ROLE_KEY),false);
+  } finally {
+    for(const [k,v] of [['APP_ENV',old.env],['SUPABASE_URL',old.url],['SUPABASE_PUBLISHABLE_KEY',old.pub],['SUPABASE_SERVICE_ROLE_KEY',old.service],['DEFAULT_TRIP_SLUG',old.slug]]) v===undefined?delete process.env[k]:process.env[k]=v;
+  }
 });
-
-test('config defaults unknown environment to localStorage', async () => {const old=process.env.APP_ENV;process.env.APP_ENV='dev';try{const res=response();await configHandler({method:'GET'},res);await res.done;const p=JSON.parse(res.body);assert.equal(p.appEnv,'local');assert.equal(p.data.provider,'localStorage');assert.equal(p.data.firebase,null);}finally{old===undefined?delete process.env.APP_ENV:process.env.APP_ENV=old;}});
 
 
 test('config exposes bounded UI defaults from environment', async () => {
@@ -132,4 +144,18 @@ test('config exposes bounded UI defaults from environment', async () => {
     assert.equal(payload.ui.defaultRadarRadiusKm,3);
     assert.equal(payload.ui.defaultRadarCategory,'food');
   } finally { for (const k of keys) old[k] === undefined ? delete process.env[k] : process.env[k] = old[k]; }
+});
+
+test('APP_ENV local selects localStorage and hides Supabase client config', async () => {
+  const keys=['APP_ENV','SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY']; const old=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
+  Object.assign(process.env,{APP_ENV:'local',SUPABASE_URL:'https://example.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_public'});
+  try { const res=response(); await configHandler({method:'GET'},res); await res.done; const p=JSON.parse(res.body); assert.equal(p.appEnv,'local'); assert.equal(p.data.provider,'localStorage'); assert.equal(p.collaboration.configured,false); assert.equal(p.collaboration.supabaseUrl,''); assert.equal(p.collaboration.publishableKey,''); }
+  finally { for(const k of keys) old[k]===undefined?delete process.env[k]:process.env[k]=old[k]; }
+});
+
+test('APP_ENV prod selects Supabase when public config is present', async () => {
+  const keys=['APP_ENV','SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','DEFAULT_TRIP_SLUG']; const old=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
+  Object.assign(process.env,{APP_ENV:'prod',SUPABASE_URL:'https://abc.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_public',DEFAULT_TRIP_SLUG:'dalat-2026'});
+  try { const res=response(); await configHandler({method:'GET'},res); await res.done; const p=JSON.parse(res.body); assert.equal(p.appEnv,'prod'); assert.equal(p.data.provider,'supabase'); assert.equal(p.collaboration.configured,true); assert.equal(p.collaboration.supabaseUrl,'https://abc.supabase.co'); assert.equal(p.collaboration.defaultTripSlug,'dalat-2026'); }
+  finally { for(const k of keys) old[k]===undefined?delete process.env[k]:process.env[k]=old[k]; }
 });
