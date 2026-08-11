@@ -5,7 +5,10 @@
     "homeName": "Hotel Trường An Hotel",
     "homeLat": 11.9370985,
     "homeLng": 108.4220004,
-    "publicJoin": true
+    "publicJoin": true,
+    "peopleCount": 4
   },
-  "places": []
+  "places": [],
+  "checklists": [],
+  "album": []
 }

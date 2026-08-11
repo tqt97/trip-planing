@@ -5,7 +5,8 @@ export function buildStyles(root = process.cwd()) {
   const sourceDir = path.join(root, 'styles');
   const files = fs.readdirSync(sourceDir).filter(name => name.endsWith('.css')).sort();
   if (!files.length) throw new Error('No CSS sources found in styles/');
-  const output = files.map(name => `/* ${name} */\n${fs.readFileSync(path.join(sourceDir, name), 'utf8').trim()}\n`).join('\n');
+  const readable = files.map(name => fs.readFileSync(path.join(sourceDir, name), 'utf8').trim()).join('\n');
+  const output = readable.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').trim();
   if ((output.match(/!important/g) || []).length) throw new Error('CSS policy: !important is not allowed');
   fs.writeFileSync(path.join(root, 'styles.css'), output);
   return { files, bytes: Buffer.byteLength(output) };

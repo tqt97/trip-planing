@@ -1,10 +1,12 @@
-import { totalExpenses } from '../../core.js';
+import { averageExpensePerPerson, totalExpenses } from '../../core.js';
 import { expenseCategoryIcon, expenseCategoryLabel, formatMoney } from '../../app/ui.js';
 
-export function renderExpenses(els, rawExpenses = []) {
+export function renderExpenses(els, rawExpenses = [], peopleCount = 1) {
   const expenses = [...rawExpenses].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   els.expenseTotal.textContent = formatMoney(totalExpenses(expenses));
   els.expenseCount.textContent = `${expenses.length} khoản`;
+  if (els.expenseAverage) els.expenseAverage.textContent = formatMoney(averageExpensePerPerson(expenses, peopleCount));
+  if (els.peopleCount && document.activeElement !== els.peopleCount) els.peopleCount.value = String(Math.max(1, Number(peopleCount) || 1));
   els.expenseEmpty.hidden = expenses.length > 0;
   els.expenseList.replaceChildren(...expenses.map(expenseRow));
 }

@@ -128,6 +128,18 @@ export class SupabaseHttpClient {
     });
   }
 
+  async uploadPublicFile(bucket, path, file) {
+    const cleanPath = String(path || '').replace(/^\/+/, '');
+    const res = await fetch(`${this.url}/storage/v1/object/${encodeURIComponent(bucket)}/${cleanPath.split('/').map(encodeURIComponent).join('/')}`, {
+      method: 'POST',
+      headers: this.headers({ 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' }),
+      body: file
+    });
+    const text = await res.text(); const payload = text ? safeJson(text) : null;
+    if (!res.ok) throw new Error(payload?.message || payload?.error || `Storage HTTP ${res.status}`);
+    return `${this.url}/storage/v1/object/public/${encodeURIComponent(bucket)}/${cleanPath.split('/').map(encodeURIComponent).join('/')}`;
+  }
+
   subscribeTables(tables, onChange) {
     this.disconnectRealtime();
     if (!this.accessToken || !this.configured || typeof WebSocket === 'undefined') return () => {};

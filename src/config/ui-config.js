@@ -8,10 +8,10 @@ export const DEFAULT_UI_CONFIG = Object.freeze({
   title: 'Ní ơi, mình đi đâu thế.',
   subtitle: 'Lên danh sách, xem khoảng cách và chọn nơi đáng đi ngay lúc này.',
   defaultPageSize: 8,
-  defaultRadiusKm: 5,
+  defaultRadiusKm: 9999,
   defaultCategory: 'all',
   defaultSort: 'distance',
-  defaultRadarRadiusKm: 5,
+  defaultRadarRadiusKm: 9999,
   defaultRadarCategory: 'all'
 });
 

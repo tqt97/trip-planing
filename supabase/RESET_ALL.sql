@@ -8,6 +8,11 @@ begin;
 drop trigger if exists on_auth_user_created on auth.users;
 
 -- Drop app tables. CASCADE removes policies, FK dependencies and publication memberships.
+delete from storage.objects where bucket_id in ('place-images','trip-album');
+delete from storage.buckets where id in ('place-images','trip-album');
+
+drop table if exists public.trip_album_items cascade;
+drop table if exists public.checklists cascade;
 drop table if exists public.place_votes cascade;
 drop table if exists public.expenses cascade;
 drop table if exists public.places cascade;

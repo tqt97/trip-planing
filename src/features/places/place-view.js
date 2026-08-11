@@ -4,6 +4,7 @@ import { categoryIcon, formatDistance, formatDuration, priorityLabel } from '../
 export function createPlaceRow(place, { currentUserId, votes = [] } = {}) {
   const row = document.createElement('article'); row.className = 'place-row'; row.dataset.id = place.id;
   const main = document.createElement('div'); main.className = 'place-main';
+  if (place.imageUrl) { const img = document.createElement('img'); img.className = 'place-thumb'; img.src = place.imageUrl; img.alt = ''; img.loading = 'lazy'; main.append(img); }
   const h = document.createElement('h3'); h.textContent = `${categoryIcon(place.category)} ${place.name}`;
   const p = document.createElement('p'); p.textContent = `${priorityLabel(place.priority)} · ${place.address || `${place.lat?.toFixed(5)}, ${place.lng?.toFixed(5)}`}`;
   const meta = document.createElement('div'); meta.className = 'route-meta';
@@ -11,6 +12,8 @@ export function createPlaceRow(place, { currentUserId, votes = [] } = {}) {
   const eta = document.createElement('span'); eta.className = 'route-pill'; eta.textContent = formatDuration(place.durationSeconds);
   const voteBtn = document.createElement('button'); voteBtn.type = 'button'; voteBtn.className = `vote-btn${hasUserVoted(place.id, currentUserId, votes) ? ' voted' : ''}`; voteBtn.dataset.action = 'vote'; voteBtn.textContent = `♥ ${votes.filter(v => v.place_id === place.id).length}`; voteBtn.title = 'Vote địa điểm'; voteBtn.disabled = !currentUserId;
   meta.append(source, eta, voteBtn); main.append(h, p, meta);
+  if (place.note) { const note = document.createElement('p'); note.className = 'place-note'; note.textContent = place.note; main.append(note); }
+  if (place.noteUrl) { const link = document.createElement('a'); link.className = 'place-note-link'; link.href = place.noteUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '↗ Mở link ghi chú'; main.append(link); }
   const distance = document.createElement('div'); distance.className = 'distance';
   const strong = document.createElement('strong'); strong.textContent = formatDistance(place.distanceMeters);
   const span = document.createElement('span'); span.textContent = 'từ Home'; distance.append(strong, span);

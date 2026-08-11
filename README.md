@@ -1,4 +1,13 @@
-# Đà Lạt Nearby Planner v2.5.1
+
+## v2.7
+
+- Places/Radar mặc định **Tất cả khoảng cách**.
+- Chi tiêu mặc định **4 người** và tính trung bình/người.
+- **Trip Album**: ảnh/link tham khảo, trạng thái Tham khảo/Muốn đi/Đã đi, horizontal gallery + lightbox.
+- Checklist hiển thị người đã check done bằng avatar chữ cái đầu email.
+- Production hiện tại chỉ cần chạy `supabase/migrations/003_album_checklist_completion.sql`.
+
+# Đà Lạt Nearby Planner v2.7.1
 
 Mobile-first trip planner với hai data mode rõ ràng:
 
@@ -38,7 +47,8 @@ DEFAULT_TRIP_SLUG=dalat-2026
 ## Database clean setup
 
 - `supabase/RESET_ALL.sql`: xóa schema app cũ.
-- `supabase/migrations/001_v2_collaboration.sql`: schema + RLS + RPC + Realtime.
+- `supabase/migrations/001_v2_collaboration.sql`: schema collaboration nền.
+- `supabase/migrations/002_trip_features.sql`: chia chi phí, ảnh/link địa điểm, checklist + RLS/Realtime/Storage.
 - `supabase/002_seed_default_trip.sql`: tạo Trip `dalat-2026`.
 - `supabase/RESET_MIGRATE_SEED.sql`: reset + migrate + seed một lần.
 
@@ -76,3 +86,17 @@ npm run quality
 ```
 
 Chạy lint/security, unit/API/RLS tests, UI gate, performance budget, build, smoke và monkey tests.
+
+
+## v2.6 Trip utilities
+
+- Mobile Places/Expenses/Checklist dùng **page scroll tự nhiên**, không còn nested scroll.
+- Chi tiêu có `Số người` và `Trung bình/người`; production lưu `trips.people_count`.
+- Place hỗ trợ `noteUrl` và upload ảnh. Local nén/lưu data URL trong localStorage; production upload vào Supabase Storage bucket `place-images`.
+- Checklist có loại `Chuẩn bị` / `Trong chuyến`, visibility `public` / `private`. Public cho thành viên Trip cùng sửa; private chỉ người tạo thấy/sửa.
+- Export/import local state đã lên version 4, giữ Places + Expenses + Checklist + trip settings.
+
+Nếu database production đã có v2.5, chỉ cần chạy `supabase/migrations/002_trip_features.sql`. Nếu muốn dựng sạch từ đầu, chạy `supabase/RESET_MIGRATE_SEED.sql`.
+
+
+Kiến trúc chi tiết: [docs/ARCHITECTURE_V2_6.md](docs/ARCHITECTURE_V2_6.md).

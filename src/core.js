@@ -2,6 +2,9 @@ export const DEFAULT_RADIUS_KM = 5;
 export const CATEGORIES = ['food', 'cafe', 'attraction', 'shopping', 'other'];
 export const PRIORITIES = ['must', 'want', 'maybe'];
 export const EXPENSE_CATEGORIES = ['food', 'cafe', 'transport', 'attraction', 'shopping', 'stay', 'other'];
+export const CHECKLIST_CATEGORIES = ['prepare', 'during'];
+export const CHECKLIST_VISIBILITIES = ['public', 'private'];
+export const ALBUM_STATUSES = ['reference', 'want', 'visited'];
 
 export function uid(prefix = 'id') {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -19,6 +22,8 @@ export function sanitizePlace(input = {}) {
     category: CATEGORIES.includes(input.category) ? input.category : 'other',
     priority: PRIORITIES.includes(input.priority) ? input.priority : 'want',
     note: normalizeText(input.note, 500),
+    noteUrl: safeHttpUrl(input.noteUrl, 1200),
+    imageUrl: safeImageValue(input.imageUrl, 5000000),
     lat: finiteOrNull(input.lat, -90, 90),
     lng: finiteOrNull(input.lng, -180, 180),
     distanceMeters: nonNegativeOrNull(input.distanceMeters),
@@ -30,6 +35,56 @@ export function sanitizePlace(input = {}) {
   };
 }
 
+
+export function sanitizeTripSettings(input = {}) {
+  const parsedPeople = Number.parseInt(input.peopleCount, 10);
+  const peopleCount = Number.isFinite(parsedPeople) ? Math.max(1, Math.min(50, parsedPeople)) : 4;
+  return { peopleCount };
+}
+
+export function sanitizeChecklist(input = {}) {
+  return {
+    id: normalizeText(input.id, 80) || uid('check'),
+    title: normalizeText(input.title, 180),
+    category: CHECKLIST_CATEGORIES.includes(input.category) ? input.category : 'prepare',
+    visibility: CHECKLIST_VISIBILITIES.includes(input.visibility) ? input.visibility : 'public',
+    done: Boolean(input.done),
+    note: normalizeText(input.note, 500),
+    createdBy: normalizeText(input.createdBy ?? input.created_by, 80),
+    completedBy: normalizeText(input.completedBy ?? input.completed_by, 80),
+    completedAt: validIso(input.completedAt ?? input.completed_at),
+    createdAt: validIso(input.createdAt ?? input.created_at) || new Date().toISOString(),
+    updatedAt: validIso(input.updatedAt ?? input.updated_at) || new Date().toISOString()
+  };
+}
+
+export function validateChecklist(item) {
+  const errors = [];
+  if (!item.title || item.title.length < 2) errors.push('Checklist cần nội dung ít nhất 2 ký tự.');
+  return errors;
+}
+
+
+export function sanitizeAlbumItem(input = {}) {
+  return {
+    id: normalizeText(input.id, 80) || uid('album'),
+    title: normalizeText(input.title, 160),
+    status: ALBUM_STATUSES.includes(input.status) ? input.status : 'reference',
+    note: normalizeText(input.note, 600),
+    noteUrl: safeHttpUrl(input.noteUrl ?? input.note_url, 1200),
+    imageUrl: safeImageValue(input.imageUrl ?? input.image_url, 5000000),
+    createdBy: normalizeText(input.createdBy ?? input.created_by, 80),
+    createdAt: validIso(input.createdAt ?? input.created_at) || new Date().toISOString(),
+    updatedAt: validIso(input.updatedAt ?? input.updated_at) || new Date().toISOString()
+  };
+}
+
+export function validateAlbumItem(item) {
+  const errors = [];
+  if (!item.title || item.title.length < 2) errors.push('Album cần tiêu đề ít nhất 2 ký tự.');
+  if (!item.imageUrl && !item.noteUrl && !item.note) errors.push('Thêm ảnh, link tham khảo hoặc ghi chú cho album.');
+  return errors;
+}
 
 export function sanitizeExpense(input = {}) {
   return {
@@ -52,6 +107,11 @@ export function validateExpense(expense) {
 
 export function totalExpenses(expenses) {
   return (Array.isArray(expenses) ? expenses : []).reduce((sum, expense) => sum + (Number.isFinite(expense.amountVnd) ? expense.amountVnd : 0), 0);
+}
+
+export function averageExpensePerPerson(expenses, peopleCount = 1) {
+  const people = Math.max(1, Math.min(50, Number.parseInt(peopleCount, 10) || 1));
+  return Math.round(totalExpenses(expenses) / people);
 }
 
 export function sanitizeHome(input = {}) {
@@ -286,13 +346,13 @@ export function groupNearby(places, thresholdMeters = 1800) {
 }
 
 export function exportState(state) {
-  return JSON.stringify({ version: 3, exportedAt: new Date().toISOString(), home: sanitizeHome(state.home), places: Array.isArray(state.places) ? state.places.map(sanitizePlace) : [], expenses: Array.isArray(state.expenses) ? state.expenses.map(sanitizeExpense) : [] }, null, 2);
+  return JSON.stringify({ version: 5, exportedAt: new Date().toISOString(), home: sanitizeHome(state.home), tripSettings: sanitizeTripSettings(state.tripSettings), places: Array.isArray(state.places) ? state.places.map(sanitizePlace) : [], expenses: Array.isArray(state.expenses) ? state.expenses.map(sanitizeExpense) : [], checklists: Array.isArray(state.checklists) ? state.checklists.map(sanitizeChecklist) : [], album: Array.isArray(state.album) ? state.album.map(sanitizeAlbumItem) : [] }, null, 2);
 }
 
 export function importState(text) {
   const parsed = JSON.parse(text);
   if (!parsed || typeof parsed !== 'object') throw new Error('File không hợp lệ.');
-  return { home: sanitizeHome(parsed.home ?? {}), places: Array.isArray(parsed.places) ? parsed.places.slice(0, 1000).map(sanitizePlace) : [], expenses: Array.isArray(parsed.expenses) ? parsed.expenses.slice(0, 5000).map(sanitizeExpense) : [] };
+  return { home: sanitizeHome(parsed.home ?? {}), tripSettings: sanitizeTripSettings(parsed.tripSettings ?? {}), places: Array.isArray(parsed.places) ? parsed.places.slice(0, 1000).map(sanitizePlace) : [], expenses: Array.isArray(parsed.expenses) ? parsed.expenses.slice(0, 5000).map(sanitizeExpense) : [], checklists: Array.isArray(parsed.checklists) ? parsed.checklists.slice(0, 5000).map(sanitizeChecklist) : [], album: Array.isArray(parsed.album) ? parsed.album.slice(0, 2000).map(sanitizeAlbumItem) : [] };
 }
 
 function finiteOrNull(value, min, max) { if (value === null || value === undefined || value === '') return null; const n = Number(value); return Number.isFinite(n) && n >= min && n <= max ? n : null; }
@@ -300,4 +360,6 @@ function positiveIntegerOrNull(value) { if (value === null || value === undefine
 function nonNegativeOrNull(value) { if (value === null || value === undefined || value === '') return null; const n = Number(value); return Number.isFinite(n) && n >= 0 ? Math.round(n) : null; }
 function coordsValid(value) { return value && Number.isFinite(value.lat) && Number.isFinite(value.lng) && value.lat >= -90 && value.lat <= 90 && value.lng >= -180 && value.lng <= 180; }
 function numericOrInfinity(value) { return Number.isFinite(value) ? value : Infinity; }
+function safeHttpUrl(value, max = 1200) { const text = normalizeText(value, max); if (!text) return ''; try { const url = new URL(text); return ['http:', 'https:'].includes(url.protocol) ? url.toString().slice(0, max) : ''; } catch { return ''; } }
+function safeImageValue(value, max = 5000000) { const text = String(value ?? '').trim(); if (!text) return ''; if (text.startsWith('data:image/')) return text.slice(0, max); return safeHttpUrl(text, 2000); }
 function validIso(value) { if (typeof value !== 'string') return null; return Number.isNaN(Date.parse(value)) ? null : new Date(value).toISOString(); }

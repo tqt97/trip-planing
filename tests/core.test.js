@@ -17,11 +17,17 @@ import {
   parseGoogleMapsCoordinates,
   resolveRadarRadiusKm,
   paginateItems,
+  averageExpensePerPerson,
+  sanitizeAlbumItem,
+  validateAlbumItem,
+  sanitizeChecklist,
   sanitizeExpense,
   sanitizeHome,
   sanitizePlace,
+  sanitizeTripSettings,
   scorePlace,
   totalExpenses,
+  validateChecklist,
   validateExpense,
   validatePlace,
   recommendPlaces,
@@ -202,4 +208,47 @@ test('recommendPlaces ranks votes first then distance and limits top 6', () => {
 test('hasUserVoted supports database vote row shape', () => {
   assert.equal(hasUserVoted('p1','u1',[{place_id:'p1',user_id:'u1'}]), true);
   assert.equal(hasUserVoted('p1','u2',[{place_id:'p1',user_id:'u1'}]), false);
+});
+
+
+test('trip people count and per-person expense average are bounded', () => {
+  assert.equal(sanitizeTripSettings({ peopleCount: 0 }).peopleCount, 1);
+  assert.equal(sanitizeTripSettings({ peopleCount: 999 }).peopleCount, 50);
+  const expenses=[sanitizeExpense({payer:'A',amountVnd:300000}),sanitizeExpense({payer:'B',amountVnd:100000})];
+  assert.equal(averageExpensePerPerson(expenses,4),100000);
+});
+
+test('checklist sanitization preserves public/private semantics and export/import', () => {
+  const item=sanitizeChecklist({title:'  Mang áo ấm ',category:'prepare',visibility:'private',done:true,note:'  tối lạnh '});
+  assert.equal(item.title,'Mang áo ấm');
+  assert.equal(item.visibility,'private');
+  assert.equal(item.done,true);
+  assert.deepEqual(validateChecklist(item),[]);
+  const restored=importState(exportState({home:sanitizeHome({}),places:[],expenses:[],tripSettings:{peopleCount:4},checklists:[item]}));
+  assert.equal(restored.tripSettings.peopleCount,4);
+  assert.equal(restored.checklists.length,1);
+  assert.equal(restored.checklists[0].title,'Mang áo ấm');
+});
+
+test('place keeps safe note URL and local image data URL', () => {
+  const p=sanitizePlace({name:'Cafe',noteUrl:'https://example.com/note',imageUrl:'data:image/png;base64,AAAA'});
+  assert.match(p.noteUrl,/^https:\/\/example\.com/);
+  assert.match(p.imageUrl,/^data:image\/png/);
+  assert.equal(sanitizePlace({name:'Cafe',noteUrl:'javascript:alert(1)'}).noteUrl,'');
+});
+
+
+test('trip album sanitizes note links and survives export/import', () => {
+  const album=sanitizeAlbumItem({title:'  Đồi chè đẹp ',status:'want',note:'  đi sáng ',noteUrl:'https://example.com/ref',imageUrl:'https://example.com/a.jpg'});
+  assert.equal(album.title,'Đồi chè đẹp');
+  assert.equal(album.status,'want');
+  assert.deepEqual(validateAlbumItem(album),[]);
+  const restored=importState(exportState({home:sanitizeHome({}),places:[],expenses:[],tripSettings:{peopleCount:4},checklists:[],album:[album]}));
+  assert.equal(restored.album.length,1);
+  assert.equal(restored.album[0].noteUrl,'https://example.com/ref');
+});
+
+test('trip album requires at least image, link or note', () => {
+  const item=sanitizeAlbumItem({title:'Ảnh đẹp',status:'reference'});
+  assert.ok(validateAlbumItem(item).length > 0);
 });

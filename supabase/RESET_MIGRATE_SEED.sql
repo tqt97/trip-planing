@@ -1,5 +1,5 @@
--- DALAT NEARBY PLANNER v2.3 - ONE SHOT CLEAN REBUILD
--- WARNING: deletes all app data in public tables. Auth users are preserved.
+-- DALAT NEARBY PLANNER v2.6 - ONE SHOT CLEAN REBUILD
+-- WARNING: deletes app data but preserves auth.users.
 
 -- DALAT NEARBY PLANNER v2.3 - RESET SHARED APP SCHEMA
 -- WARNING: This deletes all app data in public.* tables below.
@@ -11,6 +11,10 @@ begin;
 drop trigger if exists on_auth_user_created on auth.users;
 
 -- Drop app tables. CASCADE removes policies, FK dependencies and publication memberships.
+delete from storage.objects where bucket_id = 'place-images';
+delete from storage.buckets where id = 'place-images';
+
+drop table if exists public.checklists cascade;
 drop table if exists public.place_votes cascade;
 drop table if exists public.expenses cascade;
 drop table if exists public.places cascade;
@@ -28,6 +32,7 @@ drop function if exists public.handle_new_user() cascade;
 drop function if exists public.touch_updated_at() cascade;
 
 commit;
+
 
 -- DALAT NEARBY PLANNER v2.3 - CLEAN COLLABORATION SCHEMA
 -- Run after supabase/RESET_ALL.sql when rebuilding from scratch.
@@ -488,6 +493,149 @@ $$;
 
 commit;
 
+
+-- DALAT NEARBY PLANNER v2.6 - EXPENSE SPLIT + MEDIA + CHECKLISTS
+begin;
+
+alter table public.trips
+  add column if not exists people_count integer not null default 4
+  check (people_count between 1 and 50);
+
+alter table public.places
+  add column if not exists note_url text not null default '',
+  add column if not exists image_url text not null default '';
+
+create table if not exists public.checklists (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid not null references public.trips(id) on delete cascade,
+  title text not null,
+  category text not null default 'prepare' check (category in ('prepare','during')),
+  visibility text not null default 'public' check (visibility in ('public','private')),
+  done boolean not null default false,
+  note text not null default '',
+  created_by uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists checklists_trip_idx on public.checklists(trip_id, updated_at desc);
+
+drop trigger if exists checklists_touch_updated_at on public.checklists;
+create trigger checklists_touch_updated_at
+before update on public.checklists
+for each row execute function public.touch_updated_at();
+
+alter table public.checklists enable row level security;
+
+-- All Trip members can see public items. Private items are only visible to their creator.
+drop policy if exists checklists_visible_select on public.checklists;
+create policy checklists_visible_select
+on public.checklists for select to authenticated
+using (
+  public.is_trip_member(public.checklists.trip_id)
+  and (public.checklists.visibility = 'public' or public.checklists.created_by = auth.uid())
+);
+
+-- Every Trip member may create a checklist item. Private ownership is always the current user.
+drop policy if exists checklists_member_insert on public.checklists;
+create policy checklists_member_insert
+on public.checklists for insert to authenticated
+with check (
+  public.is_trip_member(public.checklists.trip_id)
+  and public.checklists.created_by = auth.uid()
+);
+
+-- Public checklist is collaborative, private checklist is creator-only.
+drop policy if exists checklists_member_update on public.checklists;
+create policy checklists_member_update
+on public.checklists for update to authenticated
+using (
+  public.is_trip_member(public.checklists.trip_id)
+  and (public.checklists.visibility = 'public' or public.checklists.created_by = auth.uid())
+)
+with check (
+  public.is_trip_member(public.checklists.trip_id)
+  and (public.checklists.visibility = 'public' or public.checklists.created_by = auth.uid())
+);
+
+drop policy if exists checklists_member_delete on public.checklists;
+create policy checklists_member_delete
+on public.checklists for delete to authenticated
+using (
+  public.is_trip_member(public.checklists.trip_id)
+  and (public.checklists.visibility = 'public' or public.checklists.created_by = auth.uid())
+);
+
+-- Editors can change trip-level split settings. This supersedes the owner-only update policy.
+drop policy if exists trips_owner_update on public.trips;
+drop policy if exists trips_editor_update on public.trips;
+create policy trips_editor_update
+on public.trips for update to authenticated
+using (public.can_edit_trip(public.trips.id))
+with check (public.can_edit_trip(public.trips.id));
+
+revoke all on public.checklists from anon, public;
+grant select, insert, update, delete on public.checklists to authenticated;
+
+alter table public.checklists replica identity full;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'checklists'
+  ) then
+    alter publication supabase_realtime add table public.checklists;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'trips'
+  ) then
+    alter publication supabase_realtime add table public.trips;
+  end if;
+end;
+$$;
+
+-- Public media bucket for place photos. Object paths are trip_id/place_id/file.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('place-images', 'place-images', true, 5242880, array['image/jpeg','image/png','image/webp','image/gif'])
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+-- Upload/delete is limited to Trip editors. Public bucket makes download URLs directly usable by the UI.
+drop policy if exists place_images_editor_insert on storage.objects;
+create policy place_images_editor_insert on storage.objects
+for insert to authenticated
+with check (
+  bucket_id = 'place-images'
+  and public.can_edit_trip(((storage.foldername(name))[1])::uuid)
+);
+
+drop policy if exists place_images_editor_update on storage.objects;
+create policy place_images_editor_update on storage.objects
+for update to authenticated
+using (
+  bucket_id = 'place-images'
+  and public.can_edit_trip(((storage.foldername(name))[1])::uuid)
+)
+with check (
+  bucket_id = 'place-images'
+  and public.can_edit_trip(((storage.foldername(name))[1])::uuid)
+);
+
+drop policy if exists place_images_editor_delete on storage.objects;
+create policy place_images_editor_delete on storage.objects
+for delete to authenticated
+using (
+  bucket_id = 'place-images'
+  and public.can_edit_trip(((storage.foldername(name))[1])::uuid)
+);
+
+commit;
+
+
 -- Default shared Trip. Edit these values if your Vercel DEFAULT_TRIP_SLUG/Home differs.
 insert into public.trips (
   slug,
@@ -495,7 +643,8 @@ insert into public.trips (
   home_name,
   home_lat,
   home_lng,
-  public_join
+  public_join,
+  people_count
 )
 values (
   'dalat-2026',
@@ -503,7 +652,8 @@ values (
   'Hotel Trường An Hotel',
   11.9370985,
   108.4220004,
-  true
+  true,
+  4
 )
 on conflict (slug) do update
 set name = excluded.name,
@@ -511,4 +661,91 @@ set name = excluded.name,
     home_lat = excluded.home_lat,
     home_lng = excluded.home_lng,
     public_join = excluded.public_join,
+    people_count = excluded.people_count,
     updated_at = now();
+
+
+-- DALAT NEARBY PLANNER v2.7 - TRIP ALBUM + CHECKLIST COMPLETION ACTOR
+begin;
+
+alter table public.trips alter column people_count set default 4;
+update public.trips set people_count = 4 where people_count is null;
+
+alter table public.checklists
+  add column if not exists completed_by uuid null references auth.users(id) on delete set null,
+  add column if not exists completed_at timestamptz null;
+
+create or replace function public.capture_checklist_completion()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.done = true and (tg_op = 'INSERT' or old.done is distinct from true) then
+    new.completed_by := auth.uid();
+    new.completed_at := now();
+  elsif new.done = false then
+    new.completed_by := null;
+    new.completed_at := null;
+  elsif tg_op = 'UPDATE' and old.done = true and new.done = true then
+    -- Completion identity is server-owned: ordinary edits cannot impersonate another member.
+    new.completed_by := old.completed_by;
+    new.completed_at := old.completed_at;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists checklists_capture_completion on public.checklists;
+create trigger checklists_capture_completion
+before insert or update of done on public.checklists
+for each row execute function public.capture_checklist_completion();
+
+create table if not exists public.trip_album_items (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid not null references public.trips(id) on delete cascade,
+  title text not null,
+  status text not null default 'reference' check (status in ('reference','want','visited')),
+  note text not null default '',
+  note_url text not null default '',
+  image_url text not null default '',
+  created_by uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists trip_album_items_trip_idx on public.trip_album_items(trip_id, updated_at desc);
+drop trigger if exists trip_album_items_touch_updated_at on public.trip_album_items;
+create trigger trip_album_items_touch_updated_at before update on public.trip_album_items for each row execute function public.touch_updated_at();
+alter table public.trip_album_items enable row level security;
+
+drop policy if exists album_trip_select on public.trip_album_items;
+create policy album_trip_select on public.trip_album_items for select to authenticated using (public.is_trip_member(public.trip_album_items.trip_id));
+drop policy if exists album_editor_insert on public.trip_album_items;
+create policy album_editor_insert on public.trip_album_items for insert to authenticated with check (public.can_edit_trip(public.trip_album_items.trip_id) and public.trip_album_items.created_by = auth.uid());
+drop policy if exists album_editor_update on public.trip_album_items;
+create policy album_editor_update on public.trip_album_items for update to authenticated using (public.can_edit_trip(public.trip_album_items.trip_id)) with check (public.can_edit_trip(public.trip_album_items.trip_id));
+drop policy if exists album_editor_delete on public.trip_album_items;
+create policy album_editor_delete on public.trip_album_items for delete to authenticated using (public.can_edit_trip(public.trip_album_items.trip_id));
+revoke all on public.trip_album_items from anon, public;
+grant select, insert, update, delete on public.trip_album_items to authenticated;
+alter table public.trip_album_items replica identity full;
+
+do $$ begin
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='trip_album_items') then
+    alter publication supabase_realtime add table public.trip_album_items;
+  end if;
+end $$;
+
+insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
+values ('trip-album','trip-album',true,5242880,array['image/jpeg','image/png','image/webp','image/gif'])
+on conflict (id) do update set public=excluded.public,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
+
+drop policy if exists trip_album_editor_insert on storage.objects;
+create policy trip_album_editor_insert on storage.objects for insert to authenticated with check (bucket_id='trip-album' and public.can_edit_trip(((storage.foldername(name))[1])::uuid));
+drop policy if exists trip_album_editor_update on storage.objects;
+create policy trip_album_editor_update on storage.objects for update to authenticated using (bucket_id='trip-album' and public.can_edit_trip(((storage.foldername(name))[1])::uuid)) with check (bucket_id='trip-album' and public.can_edit_trip(((storage.foldername(name))[1])::uuid));
+drop policy if exists trip_album_editor_delete on storage.objects;
+create policy trip_album_editor_delete on storage.objects for delete to authenticated using (bucket_id='trip-album' and public.can_edit_trip(((storage.foldername(name))[1])::uuid));
+
+commit;
+

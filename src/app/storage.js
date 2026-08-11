@@ -1,6 +1,6 @@
 import { exportState, importState, sanitizeHome } from '../core.js';
 
-export const STORAGE_KEY = 'dalat-nearby-planner:v3';
+export const STORAGE_KEY = 'dalat-nearby-planner:v5';
 export const TRACE_KEY = 'dalat-nearby-planner:traces:v1';
 export const UI_PREFS_KEY = 'dalat-nearby-planner:ui:v1';
 export const MAX_TRACES = 80;
@@ -14,12 +14,14 @@ export function normalizePageSize(value) {
 export function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
+      || localStorage.getItem('dalat-nearby-planner:v4')
+      || localStorage.getItem('dalat-nearby-planner:v3')
       || localStorage.getItem('dalat-nearby-planner:v2')
       || localStorage.getItem('dalat-nearby-planner:v1');
-    if (!raw) return { home: sanitizeHome({}), places: [], expenses: [] };
+    if (!raw) return { home: sanitizeHome({}), tripSettings: { peopleCount: 4 }, places: [], expenses: [], checklists: [], album: [] };
     return importState(raw);
   } catch {
-    return { home: sanitizeHome({}), places: [], expenses: [] };
+    return { home: sanitizeHome({}), tripSettings: { peopleCount: 4 }, places: [], expenses: [], checklists: [], album: [] };
   }
 }
 

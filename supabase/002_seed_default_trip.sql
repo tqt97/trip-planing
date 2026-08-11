@@ -5,7 +5,8 @@ insert into public.trips (
   home_name,
   home_lat,
   home_lng,
-  public_join
+  public_join,
+  people_count
 )
 values (
   'dalat-2026',
@@ -13,7 +14,8 @@ values (
   'Hotel Trường An Hotel',
   11.9370985,
   108.4220004,
-  true
+  true,
+  4
 )
 on conflict (slug) do update
 set name = excluded.name,
@@ -21,4 +23,5 @@ set name = excluded.name,
     home_lat = excluded.home_lat,
     home_lng = excluded.home_lng,
     public_join = excluded.public_join,
+    people_count = excluded.people_count,
     updated_at = now();

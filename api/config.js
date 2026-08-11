@@ -28,10 +28,10 @@ export default async function handler(req, res) {
       title: envText('UI_TITLE', 'Ní ơi, mình đi đâu thế.', 100),
       subtitle: envText('UI_SUBTITLE', 'Lên danh sách, xem khoảng cách và chọn nơi đáng đi ngay lúc này.', 180),
       defaultPageSize: envNumber('UI_DEFAULT_PAGE_SIZE', 8),
-      defaultRadiusKm: envNumber('UI_DEFAULT_RADIUS_KM', 5),
+      defaultRadiusKm: envNumber('UI_DEFAULT_RADIUS_KM', 9999),
       defaultCategory: envText('UI_DEFAULT_CATEGORY', 'all', 24),
       defaultSort: envText('UI_DEFAULT_SORT', 'distance', 24),
-      defaultRadarRadiusKm: envNumber('UI_DEFAULT_RADAR_RADIUS_KM', 5),
+      defaultRadarRadiusKm: envNumber('UI_DEFAULT_RADAR_RADIUS_KM', 9999),
       defaultRadarCategory: envText('UI_DEFAULT_RADAR_CATEGORY', 'all', 24)
     }
   });

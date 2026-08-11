@@ -5,8 +5,8 @@ const css = fs.readFileSync('styles.css','utf8');
 const app = fs.readFileSync('app.js','utf8');
 const main = fs.readFileSync('src/app/main.js','utf8');
 const modules = [
-  'src/app/ui.js','src/app/storage.js','src/app/radar-view.js','src/app/demo-seed.js','src/app/app-shell.js',
-  'src/data/supabase-client.js','src/data/repository.js'
+  'src/app/ui.js','src/app/storage.js','src/app/radar-view.js','src/app/demo-seed.js','src/app/app-shell.js','src/app/bindings.js',
+  'src/data/supabase-client.js','src/data/repository.js','src/features/checklists/checklist-view.js','src/features/checklists/checklist-controller.js','src/features/places/place-media.js','src/features/album/album-view.js','src/features/album/album-controller.js','src/features/album/album-media.js'
 ].map((f)=>[f,fs.readFileSync(f,'utf8')]);
 const assert = (ok, message) => { if (!ok) throw new Error(`UI check failed: ${message}`); };
 const has = (re) => re.test(css);
@@ -26,8 +26,7 @@ assert(main.includes("coordsDetails.open=window.matchMedia('(max-width: 820px)')
 assert(has(/dialog form,\.trace-panel,\.members-panel\{[^}]*background:/s), 'members modal must use the same solid dialog surface');
 assert(has(/@media\s*\(min-width:\s*821px\)\s*\{[\s\S]*?content-visibility:\s*auto/s), 'content-visibility must be desktop-only to avoid mobile layout shifts');
 assert(has(/\.shell\s*\{[^}]*width:\s*min\(calc\(100% - 48px\)/s) && has(/@media\s*\(max-width:\s*360px\)[\s\S]*?\.shell\s*\{[^}]*width:\s*calc\(100% - 14px\)/s), 'shell viewport gutters missing');
-assert(has(/\.places-list\s*\{[^}]*max-height:\s*520px[^}]*overflow:\s*auto/s), 'mobile places bounded scroll missing');
-assert(has(/\.expense-list\s*\{[^}]*max-height:\s*430px[^}]*overflow:\s*auto/s), 'mobile expenses bounded scroll missing');
+assert(has(/@media\s*\(max-width:\s*820px\)[\s\S]*?\.places-list,\.expense-list,\.checklist-list\{[^}]*max-height:\s*none[^}]*overflow:\s*visible/s), 'mobile lists must use natural page scroll');
 assert(has(/\.mobile-fab\s*\{[^}]*right:\s*14px[^}]*bottom:\s*calc\(76px/s) && has(/\.back-to-top\s*\{[^}]*right:\s*14px[^}]*bottom:\s*calc\(122px/s), 'floating control stack is not aligned right');
 assert(has(/\.place-form \.form-grid-compact\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/s), 'paired mobile form fields missing');
 assert(has(/\.row-actions\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/s), 'place actions must stay one horizontal row');
@@ -41,12 +40,20 @@ assert(has(/@media\s*\(max-width:\s*360px\)[\s\S]*?\.stats\s*\{[^}]*grid-templat
 assert(css.includes('.section-collapse-hit:hover') && css.includes('box-shadow:'), 'collapse affordance must be surface-based');
 assert(html.includes('role="button" tabindex="0" aria-expanded="true"'), 'collapsible headers need keyboard semantics');
 assert(main.includes("interactive=event.target.closest('button,a,input,select,textarea,label,summary,details')"), 'header collapse must protect nested controls');
-assert(Buffer.byteLength(css) < 34000, `CSS budget exceeded (${Buffer.byteLength(css)} bytes)`);
+assert(fs.readFileSync('src/app/bindings.js','utf8').includes('OPTIONAL_UI_BIND_SKIPPED') && main.includes('bindScrollControl({'), 'optional navigation controls must use null-safe binding');
+assert(!/document\.querySelector\([^\n;]+\)\.addEventListener/.test(main), 'direct querySelector().addEventListener binding can crash when optional layout controls are absent');
+assert(Buffer.byteLength(css) < 40000, `CSS budget exceeded (${Buffer.byteLength(css)} bytes)`);
 assert(Buffer.byteLength(app) < 1000, `bootstrap app.js budget exceeded (${Buffer.byteLength(app)} bytes)`);
 assert(Buffer.byteLength(main) < 36000, `src/app/main.js budget exceeded (${Buffer.byteLength(main)} bytes)`);
 for (const [file, content] of modules) assert(Buffer.byteLength(content) < 18000, `${file} module budget exceeded`);
 const totalJs = Buffer.byteLength(app) + Buffer.byteLength(main) + modules.reduce((sum,[,content])=>sum+Buffer.byteLength(content),0);
-assert(totalJs < 85000, `total browser JS budget exceeded (${totalJs} bytes)`);
+assert(totalJs < 100000, `total browser JS budget exceeded (${totalJs} bytes)`);
+assert(html.includes('id="albumSection"') && html.includes('id="albumLightbox"'), 'Trip Album UI missing');
+assert(html.includes('id="peopleCount"') && html.includes('id="checklistSection"') && html.includes('id="placeImage"') && html.includes('id="placeNoteUrl"'), 'v2.6 trip utility UI missing');
+assert(css.includes('.album-strip') && css.includes('.check-completer'), 'v2.7 album/checklist completion styles missing');
+assert(/\.album-strip\s*\{[^}]*grid-template-columns:\s*repeat\(4/.test(css) && /@media\s*\(max-width:\s*820px\)[\s\S]*?\.album-strip\s*\{[^}]*grid-template-columns:\s*repeat\(2/.test(css), 'album must use responsive thumbnail grid instead of horizontal scroller');
+assert(html.includes('class="album-toolbar"') && !html.includes('id="albumImagePreview"'), 'album filter placement or preview removal regression');
+assert(css.includes('.checklist-row') && css.includes('.place-image-preview'), 'v2.6 feature styles missing');
 assert(!/<script[^>]+src="https?:\/\//.test(html) && !/<link[^>]+href="https?:\/\//.test(html), 'runtime external CSS/JS dependency detected');
 
 console.log(`ui-check: responsive invariants passed; CSS ${Buffer.byteLength(css)} B, app ${Buffer.byteLength(app)} B, total JS ${totalJs} B, 0 !important`);

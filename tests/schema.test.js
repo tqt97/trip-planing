@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const sql = fs.readFileSync('supabase/migrations/001_v2_collaboration.sql', 'utf8');
+const featuresSql = fs.readFileSync('supabase/migrations/002_trip_features.sql', 'utf8');
+const albumSql = fs.readFileSync('supabase/migrations/003_album_checklist_completion.sql', 'utf8');
 const resetSql = fs.readFileSync('supabase/RESET_ALL.sql', 'utf8');
 const seed = fs.readFileSync('scripts/db-seed.mjs', 'utf8');
 
@@ -56,4 +58,30 @@ test('join RPC fully qualifies trip_id references and reset script is complete',
     assert.match(resetSql, new RegExp('drop table if exists public\\.' + table + ' cascade', 'i'));
   }
   assert.match(resetSql, /drop trigger if exists on_auth_user_created on auth\.users/i);
+});
+
+
+test('v2.6 feature migration secures checklist privacy, trip split settings and media bucket', () => {
+  assert.match(featuresSql,/add column if not exists people_count/i);
+  assert.match(featuresSql,/add column if not exists note_url/i);
+  assert.match(featuresSql,/add column if not exists image_url/i);
+  assert.match(featuresSql,/create table if not exists public\.checklists/i);
+  assert.match(featuresSql,/visibility = 'public' or public\.checklists\.created_by = auth\.uid\(\)/i);
+  assert.match(featuresSql,/alter publication supabase_realtime add table public\.checklists/i);
+  assert.match(featuresSql,/insert into storage\.buckets[\s\S]*?'place-images'/i);
+  assert.match(featuresSql,/place_images_editor_insert/i);
+  assert.match(resetSql,/drop table if exists public\.checklists cascade/i);
+  assert.match(resetSql,/delete from storage\.objects where bucket_id (?:= 'place-images'|in \('place-images','trip-album'\))/i);
+});
+
+
+test('v2.7 album migration secures shared album and checklist completion actor', () => {
+  assert.match(albumSql,/create table if not exists public\.trip_album_items/i);
+  assert.match(albumSql,/album_editor_insert/i);
+  assert.match(albumSql,/insert into storage\.buckets[\s\S]*?'trip-album'/i);
+  assert.match(albumSql,/capture_checklist_completion/i);
+  assert.match(albumSql,/completed_by/i);
+  assert.match(albumSql,/alter publication supabase_realtime add table public\.trip_album_items/i);
+  assert.match(resetSql,/drop table if exists public\.trip_album_items cascade/i);
+  assert.match(resetSql,/trip-album/i);
 });

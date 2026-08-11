@@ -1,4 +1,4 @@
-import { calibrateDurationSeconds, estimateDurationSeconds, estimateRoadMeters, exportState, filterAndSortPlaces, googleMapsCoordinateUrl, haversineMeters, importState, paginateItems, parseGoogleMapsCoordinates, hasUserVoted, sanitizeExpense, sanitizeHome, sanitizePlace, uid, validateExpense, validatePlace } from '/src/core.js';
+import { calibrateDurationSeconds, estimateDurationSeconds, estimateRoadMeters, exportState, filterAndSortPlaces, googleMapsCoordinateUrl, haversineMeters, importState, paginateItems, parseGoogleMapsCoordinates, hasUserVoted, sanitizeChecklist, sanitizeExpense, sanitizeHome, sanitizePlace, sanitizeTripSettings, uid, validateChecklist, validateExpense, validatePlace } from '/src/core.js';
 import { SupabaseHttpClient } from '/src/data/supabase-client.js';
 import { CollaborativeRepository } from '/src/data/repository.js';
 import { loadState, loadTraces, loadUiPrefs, MAX_TRACES, normalizePageSize, persistState, saveTraces as persistTraces, saveUiPrefs as persistUiPrefs } from '/src/app/storage.js';
@@ -8,13 +8,20 @@ import { normalizeUiConfig, applyUiConfig } from '/src/config/ui-config.js';
 import { createPlaceRow, renderPagination } from '/src/features/places/place-view.js';
 import { renderRecommendations, renderClusters } from '/src/features/recommendations/recommendation-view.js';
 import { renderExpenses } from '/src/features/expenses/expense-view.js';
+import { createChecklistController } from '/src/features/checklists/checklist-controller.js';
+import { createAlbumController } from '/src/features/album/album-controller.js';
+import { fileToDataUrl, previewPlaceImage } from '/src/features/places/place-media.js';
 import { renderMemberList } from '/src/features/members/member-view.js';
 import { createDiagnostics } from '/src/features/diagnostics/diagnostics.js';
 import { createDemoPlaces } from '/src/app/demo-seed.js';
 import { createAppShell } from '/src/app/app-shell.js';
+import { bindScrollControl } from '/src/app/bindings.js';
 
 const APP_STARTED_AT = performance.now();
 const state = loadState();
+state.tripSettings = sanitizeTripSettings(state.tripSettings || { peopleCount: 4 });
+state.checklists = Array.isArray(state.checklists) ? state.checklists : [];
+state.album = Array.isArray(state.album) ? state.album : [];
 let uiPrefs = loadUiPrefs();
 let uiConfig = normalizeUiConfig();
 let currentPage = 1;
@@ -33,6 +40,8 @@ const diagnostics = createDiagnostics({ initial: loadTraces(), max: MAX_TRACES, 
 const trace = diagnostics.trace;
 const errorDetails = diagnostics.details;
 const appShell = createAppShell({ bootGate: $('#bootGate'), bootMessage: $('#bootMessage'), authGate: $('#authGate'), authMessage: $('#authMessage'), loginButton: $('#googleLoginBtn') });
+const checklistController = createChecklistController({ els, state, getRepository: () => repository, getCurrentUser: () => currentUser, getMembers: () => members, persistState, toast, trace, errorDetails });
+const albumController = createAlbumController({ els, state, getRepository: () => repository, getCurrentUser: () => currentUser, persistState, toast, trace, errorDetails });
 
 await init();
 async function init() {
@@ -86,6 +95,16 @@ function bind() {
   $('#exportBtn').addEventListener('click', downloadState);
   $('#importInput').addEventListener('change', importFile);
   $('#addExpenseBtn').addEventListener('click', () => openExpenseDialog());
+  $('#addChecklistBtn')?.addEventListener('click', () => checklistController.open());
+  $('#addAlbumBtn')?.addEventListener('click', () => albumController.open());
+  document.querySelectorAll('.close-checklist').forEach((b) => b.addEventListener('click', () => els.checklistDialog.close()));
+  els.checklistForm?.addEventListener('submit', checklistController.save);
+  els.checklistList?.addEventListener('click', checklistController.action);
+  els.albumForm?.addEventListener('submit', albumController.save); els.albumList?.addEventListener('click', albumController.action);
+  els.albumFilter?.addEventListener('change', albumController.render);
+  document.querySelectorAll('.close-album').forEach((b)=>b.addEventListener('click',()=>els.albumDialog.close())); document.querySelectorAll('.close-album-lightbox').forEach((b)=>b.addEventListener('click',()=>els.albumLightbox.close()));
+  els.peopleCount?.addEventListener('change', onPeopleCountChange);
+  els.placeImage?.addEventListener('change', () => previewPlaceImage(els));
   document.querySelectorAll('.close-expense').forEach((b) => b.addEventListener('click', () => els.expenseDialog.close()));
   document.querySelectorAll('.section-collapse-hit').forEach((header) => { header.addEventListener('click', toggleSectionFromHeader); header.addEventListener('keydown', toggleSectionFromHeader); });
   els.expenseForm.addEventListener('submit', saveExpense);
@@ -93,10 +112,11 @@ function bind() {
   els.placesList.addEventListener('click', onPlaceAction);
   els.radarSvg.addEventListener('click', onRadarAction);
   els.radarSvg.addEventListener('keydown', onRadarKeydown);
-  document.querySelector('[data-scroll="top"]').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-  document.querySelector('[data-scroll="places"]').addEventListener('click', () => document.querySelector('.places-section').scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  document.querySelector('[data-scroll="together"]').addEventListener('click', () => document.querySelector('#togetherSection').scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  document.querySelector('[data-scroll="expenses"]').addEventListener('click', () => document.querySelector('#expenseSection').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  bindScrollControl({ selector: '[data-scroll="top"]', trace });
+  bindScrollControl({ selector: '[data-scroll="places"]', targetSelector: '.places-section', trace });
+  bindScrollControl({ selector: '[data-scroll="together"]', targetSelector: '#togetherSection', trace });
+  bindScrollControl({ selector: '[data-scroll="checklist"]', targetSelector: '#checklistSection', trace });
+  bindScrollControl({ selector: '[data-scroll="expenses"]', targetSelector: '#expenseSection', trace });
   els.backToTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
   window.addEventListener('scroll', () => els.backToTop.classList.toggle('show', window.scrollY > 520), { passive: true });
   window.addEventListener('resize', syncPlaceFiltersForViewport, { passive: true });
@@ -175,6 +195,9 @@ async function reloadCollaborativeData(reason='realtime', renderUi=true) {
   state.home = remote.home;
   state.places = remote.places;
   state.expenses = remote.expenses;
+  state.tripSettings = remote.tripSettings || sanitizeTripSettings({ peopleCount: 4 });
+  state.checklists = remote.checklists || [];
+  state.album = remote.album || [];
   votes = remote.votes;
   members = remote.members;
   const selfMember = members.find((member) => member.user_id === currentUser?.id);
@@ -186,7 +209,7 @@ async function reloadCollaborativeData(reason='realtime', renderUi=true) {
   if (reason !== 'initial') trace('info','REALTIME_SYNC','Đã đồng bộ thay đổi từ nhóm.',{reason});
 }
 function scheduleRealtimeReload(){clearTimeout(realtimeReloadTimer);realtimeReloadTimer=setTimeout(()=>reloadCollaborativeData('postgres-change').catch(error=>trace('warn','REALTIME_RELOAD_FAILED',error.message,errorDetails(error))),280)}
-function updateAccountUi(){const name=currentUser?.user_metadata?.full_name||currentUser?.user_metadata?.name||currentUser?.email||'Tài khoản';if($('#userBtn')){$('#userBtn').hidden=false;$('#userBtn').textContent=`${name} · ${repository?.role||''}`;}if($('#membersBtn'))$('#membersBtn').hidden=!repository;if($('#mobileMembersBtn'))$('#mobileMembersBtn').hidden=!repository;const editable=canEditShared();['#addBtn','#mobileAddBtn','#addExpenseBtn'].forEach(sel=>{const el=$(sel);if(el){el.disabled=!editable;el.title=editable?'':'Bạn đang ở quyền viewer';}})}
+function updateAccountUi(){const name=currentUser?.user_metadata?.full_name||currentUser?.user_metadata?.name||currentUser?.email||'Tài khoản';if($('#userBtn')){$('#userBtn').hidden=false;$('#userBtn').textContent=`${name} · ${repository?.role||''}`;}if($('#membersBtn'))$('#membersBtn').hidden=!repository;if($('#mobileMembersBtn'))$('#mobileMembersBtn').hidden=!repository;const editable=canEditShared();['#addBtn','#mobileAddBtn','#addExpenseBtn','#addAlbumBtn'].forEach(sel=>{const el=$(sel);if(el){el.disabled=!editable;el.title=editable?'':'Bạn đang ở quyền viewer';}})}
 function updateLocalModeUi(){if($('#userBtn'))$('#userBtn').hidden=true;if($('#membersBtn'))$('#membersBtn').hidden=true;if($('#mobileMembersBtn'))$('#mobileMembersBtn').hidden=true;trace('info','DATA_PROVIDER_LOCAL','Đang dùng localStorage trên thiết bị này.');}
 async function signOutUser(){if(!collaborationClient)return;if(!confirm('Đăng xuất khỏi Trip?'))return;await collaborationClient.signOut();location.reload()}
 function openMembersDialog(){renderMembers();$('#membersDialog')?.showModal()}
@@ -231,7 +254,7 @@ function render() {
   els.emptyState.hidden = filtered.length > 0;
   renderPagination(els, page);
   try { renderRadar(); } catch (error) { trace('error', 'RADAR_RENDER_FAILED', 'Không thể render radar vị trí.', errorDetails(error)); if (els.radarSummary) els.radarSummary.textContent = 'Radar tạm thời không hiển thị · mở Nhật ký để xem Trace.'; }
-  renderRecommendations(els.recommendations, state.places, votes, openGoogleMaps); renderClusters(els.clusters, state.places, openGoogleMaps); renderExpenses(els, state.expenses);
+  renderRecommendations(els.recommendations, state.places, votes, openGoogleMaps); renderClusters(els.clusters, state.places, openGoogleMaps); renderExpenses(els, state.expenses, state.tripSettings.peopleCount); checklistController.render(); albumController.render();
 }
 
 function renderRadar() { renderRadarView({ els, state }); }
@@ -256,7 +279,7 @@ async function saveExpense(event){
     state.expenses ||= [];
     let saved=input;if(repository)saved=await repository.saveExpense(input);
     const idx=state.expenses.findIndex(x=>x.id===saved.id);if(idx>=0)state.expenses[idx]=saved;else state.expenses.push(saved);
-    persistState(state);renderExpenses(els, state.expenses);els.expenseDialog.close();trace('info',idx>=0?'EXPENSE_UPDATED':'EXPENSE_ADDED',`${input.payer} · ${formatMoney(input.amountVnd)}`);toast(idx>=0?'Đã cập nhật khoản chi.':'Đã lưu khoản chi.');
+    persistState(state);renderExpenses(els, state.expenses, state.tripSettings.peopleCount);els.expenseDialog.close();trace('info',idx>=0?'EXPENSE_UPDATED':'EXPENSE_ADDED',`${input.payer} · ${formatMoney(input.amountVnd)}`);toast(idx>=0?'Đã cập nhật khoản chi.':'Đã lưu khoản chi.');
   } catch (error) {
     const id=trace('error','EXPENSE_SAVE_FAILED',error.message,errorDetails(error));
     els.expenseMessage.textContent=`Không lưu được khoản chi: ${error.message} · Trace ${id}`;
@@ -265,23 +288,26 @@ async function saveExpense(event){
   }
 }
 
-async function onExpenseAction(event){const btn=event.target.closest('[data-expense-action]');if(!btn)return;const row=btn.closest('[data-expense-id]');const expense=(state.expenses||[]).find(x=>x.id===row?.dataset.expenseId);if(!expense)return;if(btn.dataset.expenseAction==='edit'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');openExpenseDialog(expense)}if(btn.dataset.expenseAction==='delete'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');if(confirm(`Xóa khoản ${formatMoney(expense.amountVnd)} do ${expense.payer} chi?`)){if(repository)await repository.deleteExpense(expense.id);state.expenses=state.expenses.filter(x=>x.id!==expense.id);persistState(state);renderExpenses(els, state.expenses);trace('info','EXPENSE_DELETED',`${expense.payer} · ${formatMoney(expense.amountVnd)}`);toast('Đã xóa khoản chi.')}}}
+async function onExpenseAction(event){const btn=event.target.closest('[data-expense-action]');if(!btn)return;const row=btn.closest('[data-expense-id]');const expense=(state.expenses||[]).find(x=>x.id===row?.dataset.expenseId);if(!expense)return;if(btn.dataset.expenseAction==='edit'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');openExpenseDialog(expense)}if(btn.dataset.expenseAction==='delete'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');if(confirm(`Xóa khoản ${formatMoney(expense.amountVnd)} do ${expense.payer} chi?`)){if(repository)await repository.deleteExpense(expense.id);state.expenses=state.expenses.filter(x=>x.id!==expense.id);persistState(state);renderExpenses(els, state.expenses, state.tripSettings.peopleCount);trace('info','EXPENSE_DELETED',`${expense.payer} · ${formatMoney(expense.amountVnd)}`);toast('Đã xóa khoản chi.')}}}
 
 
-function openPlaceDialog(place=null){els.placeForm.reset();els.placeMessage.textContent='';els.placeId.value=place?.id||'';els.placeDialogTitle.textContent=place?'Sửa địa điểm':'Thêm địa điểm';const coordsDetails=$('#placeCoordsDetails');if(coordsDetails)coordsDetails.open=window.matchMedia('(max-width: 820px)').matches;if(place){els.placeName.value=place.name;els.placeAddress.value=place.address;els.placeCategory.value=place.category;els.placePriority.value=place.priority;els.placeNote.value=place.note;els.placeLat.value=place.lat??'';els.placeLng.value=place.lng??'';}els.placeDialog.showModal();setTimeout(()=>els.placeName.focus(),50)}
+function openPlaceDialog(place=null){els.placeForm.reset();els.placeMessage.textContent='';els.placeId.value=place?.id||'';els.placeDialogTitle.textContent=place?'Sửa địa điểm':'Thêm địa điểm';const coordsDetails=$('#placeCoordsDetails');if(coordsDetails)coordsDetails.open=window.matchMedia('(max-width: 820px)').matches;els.placeImagePreview.hidden=true;els.placeImagePreview.removeAttribute('src');if(place){els.placeName.value=place.name;els.placeAddress.value=place.address;els.placeCategory.value=place.category;els.placePriority.value=place.priority;els.placeNote.value=place.note;els.placeNoteUrl.value=place.noteUrl||'';els.placeLat.value=place.lat??'';els.placeLng.value=place.lng??'';if(place.imageUrl){els.placeImagePreview.src=place.imageUrl;els.placeImagePreview.hidden=false;}}els.placeDialog.showModal();setTimeout(()=>els.placeName.focus(),50)}
 function openHomeDialog(){els.homeMessage.textContent=repository?'Home đang lấy từ Trip dùng chung trên Supabase. Chỉnh seed/DB rồi đồng bộ lại nếu cần.':(validCoords(state.home)?'Để đổi Home, sửa .env.local rồi restart server.':'Home chưa được cấu hình trong environment.');els.homeAddress.value=state.home.address||'';els.homeLat.value=state.home.lat??'';els.homeLng.value=state.home.lng??'';els.homeDialog.showModal()}
 function fillCoordsFromMapsUrl(){const coords=parseGoogleMapsCoordinates(els.placeMapsUrl.value);if(!coords)return;els.placeLat.value=coords.lat;els.placeLng.value=coords.lng;els.placeMessage.textContent=`✓ Đã lấy tọa độ ${coords.lat}, ${coords.lng}`}
 
 async function savePlace(event){
   event.preventDefault(); els.placeMessage.textContent='';
   const urlCoords=parseGoogleMapsCoordinates(els.placeMapsUrl.value); const lat=urlCoords?.lat ?? els.placeLat.value; const lng=urlCoords?.lng ?? els.placeLng.value;
-  const input=sanitizePlace({id:els.placeId.value||(repository&&crypto.randomUUID?crypto.randomUUID():undefined),name:els.placeName.value,address:els.placeAddress.value,category:els.placeCategory.value,priority:els.placePriority.value,note:els.placeNote.value,lat,lng,source:urlCoords?'google-maps-url':'manual'});
+  const input=sanitizePlace({id:els.placeId.value||(repository&&crypto.randomUUID?crypto.randomUUID():undefined),name:els.placeName.value,address:els.placeAddress.value,category:els.placeCategory.value,priority:els.placePriority.value,note:els.placeNote.value,noteUrl:els.placeNoteUrl.value,imageUrl:state.places.find(p=>p.id===els.placeId.value)?.imageUrl||'',lat,lng,source:urlCoords?'google-maps-url':'manual'});
+  if(els.placeNoteUrl.value.trim() && !input.noteUrl){showFormError('Link ghi chú phải bắt đầu bằng http:// hoặc https://.','PLACE_NOTE_URL');return}
   if(!canEditShared()){showFormError('Bạn đang ở quyền viewer nên không thể sửa địa điểm.','ROLE_VIEWER');return}
   const errors=validatePlace(input); if(errors.length){showFormError(errors[0],'PLACE_VALIDATION');return}
   if(!validCoords(input)){showFormError('Cần Latitude/Longitude hoặc paste Google Maps URL có tọa độ.','PLACE_COORDS_MISSING');return}
   if(!validCoords(state.home)){showFormError('Home chưa cấu hình. Kiểm tra Home của Trip.','HOME_MISSING');return}
   setBusy(els.savePlaceBtn,true,'Đang lưu…'); let usedFallback=false;
   try {
+    const imageFile=els.placeImage.files?.[0];
+    if(imageFile){ input.imageUrl = repository ? await repository.uploadPlaceImage(imageFile,input.id) : await fileToDataUrl(imageFile); }
     try { await calculateDistance(input); }
     catch (error) { applyFallbackDistance(input); usedFallback=true; trace('warn','ROUTE_FALLBACK',`Đã lưu ${input.name} bằng ETA fallback.`,errorDetails(error)); }
     let saved=input; if(repository) saved=await repository.savePlace(input);
@@ -336,7 +362,18 @@ function toggleSectionFromHeader(event){
 function openGoogleMaps(lat,lng,label='Địa điểm'){const url=googleMapsCoordinateUrl(lat,lng);if(!url){const id=trace('warn','MAP_COORDS_INVALID',`Không thể mở Google Maps cho ${label}.`,{lat,lng});toast(`Tọa độ không hợp lệ · Trace ${id}`);return}window.open(url,'_blank','noopener,noreferrer')}
 
 function downloadState(){const blob=new Blob([exportState(state)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`dalat-nearby-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url)}
-async function importFile(event){const file=event.target.files?.[0];if(!file)return;try{const next=importState(await file.text());if(repository){if(!canEditShared())throw new Error('Viewer không thể import dữ liệu vào Trip.');for(const raw of next.places){const p=sanitizePlace({...raw,id:crypto.randomUUID(),source:'imported'});if(validCoords(state.home)&&validCoords(p))applyFallbackDistance(p);await repository.savePlace(p)}for(const raw of next.expenses||[]){const e=sanitizeExpense({...raw,id:crypto.randomUUID()});await repository.saveExpense(e)}await reloadCollaborativeData('import');toast(`Đã merge ${next.places.length} địa điểm · ${(next.expenses||[]).length} khoản chi vào Trip.`);}else{state.places=next.places;state.expenses=next.expenses||[];state.places.forEach(applyFallbackDistance);persistState(state);render();toast(`Đã nhập ${state.places.length} địa điểm · ${state.expenses.length} khoản chi.`)}trace('info','IMPORT_OK',`Đã nhập ${next.places.length} địa điểm.`)}catch(error){const id=trace('error','IMPORT_FAILED','Không thể nhập file JSON.',errorDetails(error));toast(`${error.message||'File JSON không hợp lệ'} · Trace ${id}`)}finally{event.target.value=''}}
+async function importFile(event){const file=event.target.files?.[0];if(!file)return;try{const next=importState(await file.text());if(repository){if(!canEditShared())throw new Error('Viewer không thể import dữ liệu vào Trip.');for(const raw of next.places){const p=sanitizePlace({...raw,id:crypto.randomUUID(),source:'imported'});if(validCoords(state.home)&&validCoords(p))applyFallbackDistance(p);await repository.savePlace(p)}for(const raw of next.expenses||[]){const e=sanitizeExpense({...raw,id:crypto.randomUUID()});await repository.saveExpense(e)}for(const raw of next.checklists||[]){const c=sanitizeChecklist({...raw,id:crypto.randomUUID(),createdBy:''});await repository.saveChecklist(c)}for(const raw of next.album||[]){const a={...raw,id:crypto.randomUUID(),imageUrl:String(raw.imageUrl||'').startsWith('http')?raw.imageUrl:''};await repository.saveAlbumItem(a)}if(next.tripSettings?.peopleCount)await repository.updatePeopleCount(next.tripSettings.peopleCount);await reloadCollaborativeData('import');toast(`Đã merge ${next.places.length} địa điểm · ${(next.expenses||[]).length} khoản chi vào Trip.`);}else{state.places=next.places;state.expenses=next.expenses||[];state.checklists=next.checklists||[];state.album=next.album||[];state.tripSettings=next.tripSettings||sanitizeTripSettings({peopleCount:4});state.places.forEach(applyFallbackDistance);persistState(state);render();toast(`Đã nhập ${state.places.length} địa điểm · ${state.expenses.length} khoản chi.`)}trace('info','IMPORT_OK',`Đã nhập ${next.places.length} địa điểm.`)}catch(error){const id=trace('error','IMPORT_FAILED','Không thể nhập file JSON.',errorDetails(error));toast(`${error.message||'File JSON không hợp lệ'} · Trace ${id}`)}finally{event.target.value=''}}
 
+
+
+async function onPeopleCountChange(){
+  const next=sanitizeTripSettings({peopleCount:els.peopleCount.value});
+  const previous=state.tripSettings.peopleCount;
+  state.tripSettings=next; renderExpenses(els,state.expenses,next.peopleCount); persistState(state);
+  if(repository){
+    if(!canEditShared()){state.tripSettings.peopleCount=previous;renderExpenses(els,state.expenses,previous);toast('Viewer không thể đổi số người.');return}
+    try{await repository.updatePeopleCount(next.peopleCount);toast(`Đã đặt ${next.peopleCount} người để chia chi phí.`)}catch(error){state.tripSettings.peopleCount=previous;renderExpenses(els,state.expenses,previous);toast(`Không lưu được số người: ${error.message}`)}
+  }
+}
 
 function openTraceDialog(){diagnostics.open(`Home: ${validCoords(state.home)?'OK':'CHƯA CẤU HÌNH'} · Routing: ${routingConfigured?'ORS ENABLED':'FALLBACK READY'}`)}
