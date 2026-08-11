@@ -1,50 +1,73 @@
-# Đà Lạt Nearby Planner v2.0.0
+# Đà Lạt Nearby Planner v2.4.3
 
-Planner mobile-first cho nhóm đi Đà Lạt: Places, Radar Home, ETA, Google Maps links, Expenses, **vote địa điểm**, Google Login, member roles và realtime sync.
+Planner mobile-first cho chuyến Đà Lạt: Places, radar quanh Home, vote, Top 6 gợi ý, gom điểm gần nhau, Expenses và Google Maps links.
 
-## Chạy nhanh local
+## Điểm mới v2.4
+
+Một source code, hai data provider theo môi trường:
+
+```text
+APP_ENV=local  -> localStorage, offline, không login, không tải Firebase SDK
+APP_ENV=prod   -> Firebase Authentication + Cloud Firestore realtime
+```
+
+Business/UI dùng chung; Firebase được lazy-load chỉ khi production provider được chọn.
+
+## Chạy local nhanh
 
 ```bash
+npm install
 cp .env.example .env.local
-# Điền Supabase config
-# Chạy migration SQL trong Supabase trước
-npm run db:seed
-npm run quality
+# giữ APP_ENV=local
 npm run dev
 ```
 
 Mở `http://127.0.0.1:3000`.
 
-## Cấu trúc chính
+Local mode lưu Places + Expenses trong browser localStorage như v1. Không cần Firebase và không cần Google login.
 
-```text
-api/                       Vercel Functions cho ORS + public runtime config
-data/default-places.json   Trip + Places seed mặc định
-src/core.js                Pure domain logic / ranking / ETA / radar
-src/data/                  Supabase Auth/REST/Realtime + repository
-src/app/                   UI/storage/radar modules
-supabase/migrations/       Schema, RLS, RPC, Realtime publication
-scripts/db-seed.mjs        Idempotent seed dùng service-role secret
+## Production Firebase
+
+Đọc [`docs/DEPLOY_FIREBASE_VERCEL_VI.md`](docs/DEPLOY_FIREBASE_VERCEL_VI.md).
+
+Các biến chính:
+
+```env
+APP_ENV=prod
+FIREBASE_API_KEY=...
+FIREBASE_AUTH_DOMAIN=YOUR_PROJECT.firebaseapp.com
+FIREBASE_PROJECT_ID=YOUR_PROJECT
+FIREBASE_APP_ID=...
+FIREBASE_MESSAGING_SENDER_ID=...
+DEFAULT_TRIP_SLUG=dalat-2026
+DEFAULT_TRIP_NAME=Đà Lạt 2026
 ```
 
-## Environment
+Deploy Firestore Rules trước khi chia sẻ app:
 
-Xem `.env.example`.
-
-Client được phép nhận:
-
-```text
-SUPABASE_URL
-SUPABASE_PUBLISHABLE_KEY
-DEFAULT_TRIP_SLUG
+```bash
+npm install -g firebase-tools
+firebase login
+firebase use YOUR_PROJECT_ID
+firebase deploy --only firestore:rules,firestore:indexes
 ```
 
-Server-only:
+## Default places
+
+Chỉnh `data/default-places.json`. Khi Trip Firebase lần đầu được tạo và Places đang trống, owner đầu tiên sẽ tự seed danh sách này nếu `FIREBASE_AUTO_SEED_DEFAULTS=true`.
+
+## Cấu trúc
 
 ```text
-SUPABASE_SECRET_KEY        # chỉ dùng local/admin seed
-SUPABASE_SERVICE_ROLE_KEY  # legacy fallback
-OPENROUTESERVICE_API_KEY   # chỉ Vercel Function/server
+api/                         Vercel functions: config + ORS route/matrix
+data/default-places.json     dữ liệu địa điểm mặc định
+firebase/                    Firestore rules/indexes
+src/app/                     orchestration, shell, storage, radar, UI helpers
+src/config/                  UI config normalization
+src/data/                    Firebase lazy client + Firebase repository
+src/features/                Places / recommendations / expenses / members / diagnostics
+styles/                      foundation / responsive / collaboration layers
+tests/                       unit/API/repository/Firestore rule contracts
 ```
 
 ## Quality
@@ -53,4 +76,6 @@ OPENROUTESERVICE_API_KEY   # chỉ Vercel Function/server
 npm run quality
 ```
 
-Chạy lint/security, unit/API/repository tests, UI quality gate, build, smoke và monkey test.
+Chạy lint/security, 31 tests, responsive UI gate, performance budget, build, smoke và 2.000 monkey mutations.
+
+Chi tiết: [`docs/QUALITY_REPORT.md`](docs/QUALITY_REPORT.md).

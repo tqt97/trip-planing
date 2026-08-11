@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn(){return request.auth != null;}
+    function tripPath(tripId){return /databases/$(database)/documents/trips/$(tripId);}
+    function memberPath(tripId,uid){return /databases/$(database)/documents/trips/$(tripId)/members/$(uid);}
+    function isMember(tripId){return signedIn() && exists(memberPath(tripId,request.auth.uid));}
+    function member(tripId){return get(memberPath(tripId,request.auth.uid));}
+    function role(tripId){return isMember(tripId) ? member(tripId).data.role : null;}
+    function canEdit(tripId){return role(tripId) == 'owner' || role(tripId) == 'editor';}
+    function isOwner(tripId){return role(tripId) == 'owner';}
+    match /trips/{tripId} {
+      allow read: if signedIn() && (isMember(tripId) || resource.data.publicJoin == true);
+      allow create: if signedIn() && request.resource.data.slug == tripId && request.resource.data.publicJoin == true && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isOwner(tripId) || (signedIn() && resource.data.publicJoin == true && resource.data.ownerUid == null && request.resource.data.ownerUid == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ownerUid','updatedAt']));
+      allow delete: if false;
+      match /members/{uid} {
+        allow get: if isMember(tripId) || (signedIn() && uid == request.auth.uid && get(tripPath(tripId)).data.publicJoin == true);
+        allow list: if isMember(tripId);
+        allow create: if signedIn() && uid == request.auth.uid && ((getAfter(tripPath(tripId)).data.ownerUid == request.auth.uid && request.resource.data.role == 'owner') || (getAfter(tripPath(tripId)).data.publicJoin == true && getAfter(tripPath(tripId)).data.ownerUid != null && request.resource.data.role == 'editor'));
+        allow update: if isOwner(tripId) && uid != request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role','updatedAt']) && request.resource.data.role in ['editor','viewer'];
+        allow delete: if false;
+      }
+      match /places/{placeId} {
+        allow get: if isMember(tripId) || (signedIn() && uid == request.auth.uid && get(tripPath(tripId)).data.publicJoin == true);
+        allow list: if isMember(tripId);
+        allow create: if canEdit(tripId) && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedBy == request.auth.uid;
+        allow update: if canEdit(tripId) && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.updatedBy == request.auth.uid;
+        allow delete: if canEdit(tripId);
+      }
+      match /expenses/{expenseId} {
+        allow get: if isMember(tripId) || (signedIn() && uid == request.auth.uid && get(tripPath(tripId)).data.publicJoin == true);
+        allow list: if isMember(tripId);
+        allow create: if canEdit(tripId) && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedBy == request.auth.uid;
+        allow update: if canEdit(tripId) && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.updatedBy == request.auth.uid;
+        allow delete: if canEdit(tripId);
+      }
+      match /votes/{voteId} {
+        allow get: if isMember(tripId) || (signedIn() && uid == request.auth.uid && get(tripPath(tripId)).data.publicJoin == true);
+        allow list: if isMember(tripId);
+        allow create: if isMember(tripId) && request.resource.data.userId == request.auth.uid && voteId == request.resource.data.placeId + '_' + request.auth.uid && exists(/databases/$(database)/documents/trips/$(tripId)/places/$(request.resource.data.placeId));
+        allow update: if false;
+        allow delete: if isMember(tripId) && resource.data.userId == request.auth.uid;
+      }
+    }
+  }
+}

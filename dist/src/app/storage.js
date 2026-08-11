@@ -27,12 +27,14 @@ export function persistState(state) {
   localStorage.setItem(STORAGE_KEY, exportState(state));
 }
 
-export function loadUiPrefs() {
+export function loadUiPrefs(defaults = {}) {
+  const fallbackPageSize = normalizePageSize(defaults.pageSize);
   try {
     const parsed = JSON.parse(localStorage.getItem(UI_PREFS_KEY) || '{}');
-    return { pageSize: normalizePageSize(parsed.pageSize) };
+    const hasStoredPageSize = Object.prototype.hasOwnProperty.call(parsed, 'pageSize');
+    return { pageSize: hasStoredPageSize ? normalizePageSize(parsed.pageSize) : fallbackPageSize, hasStoredPageSize };
   } catch {
-    return { pageSize: 8 };
+    return { pageSize: fallbackPageSize, hasStoredPageSize: false };
   }
 }
 

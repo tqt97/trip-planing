@@ -25,20 +25,31 @@
   <title>Đà Lạt Nearby Planner</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="modulepreload" href="/src/app/main.js">
+  <link rel="modulepreload" href="/src/core.js">
+  <link rel="modulepreload" href="/src/app/ui.js">
+  <script type="module" src="/app.js"></script>
 </head>
-<body>
+<body class="app-booting">
+  <div id="bootGate" class="boot-gate" role="status" aria-live="polite">
+    <div class="boot-card">
+      <span class="boot-mark" aria-hidden="true">🌲</span>
+      <div class="boot-copy"><strong>Ní ơi, đang mở chuyến đi…</strong><span id="bootMessage">Đang kiểm tra phiên đăng nhập và dữ liệu nhóm.</span></div>
+      <span class="boot-spinner" aria-hidden="true"></span>
+    </div>
+  </div>
   <div id="authGate" class="auth-gate" hidden>
     <div class="auth-card glass">
-      <span class="badge warm">TRIP V2 · CÙNG NHAU</span>
+      <span class="badge warm">TRIP · CÙNG NHAU</span>
       <h2>Cùng nhau lên kèo Đà Lạt.</h2>
-      <p>Đăng nhập Google để cả nhóm cùng xem, vote, thêm địa điểm và cập nhật chi tiêu theo thời gian thực.</p>
+      <p>Đăng nhập Google để cả nhóm cùng xem, vote, thêm địa điểm và cập nhật chi tiêu theo thời gian thực trên Firebase.</p>
       <button id="googleLoginBtn" class="primary auth-login" type="button">Đăng nhập với Google</button>
       <p id="authMessage" class="meta" role="status"></p>
     </div>
   </div>
   <div class="atmosphere" aria-hidden="true"><i></i><i></i><i></i></div>
   <header class="topbar">
-    <div class="brand-wrap"><div class="brand-title"><p class="eyebrow">ĐÀ LẠT · TRIP COMPANION</p><h1>Ní ơi, mình đi đâu thế.</h1></div><p class="subtitle">Lên danh sách, xem khoảng cách và chọn nơi đáng đi ngay lúc này.</p></div>
+    <div class="brand-wrap"><div class="brand-title"><p class="eyebrow" id="appEyebrow">ĐÀ LẠT · TRIP COMPANION</p><h1 id="appTitle">Ní ơi, mình đi đâu thế.</h1></div><p class="subtitle" id="appSubtitle">Lên danh sách, xem khoảng cách và chọn nơi đáng đi ngay lúc này.</p></div>
     <div class="top-actions desktop-actions"><button class="ghost" id="membersBtn">Nhóm</button><button class="ghost user-chip" id="userBtn" title="Tài khoản">Đang kết nối…</button><button class="ghost" id="exportBtn">Xuất</button><label class="ghost file-label">Nhập<input id="importInput" type="file" accept="application/json"></label><button class="primary" id="addBtn">+ Thêm địa điểm</button></div>
   </header>
 
@@ -118,6 +129,5 @@
 
   <button id="backToTop" class="back-to-top" type="button" aria-label="Lên đầu trang" title="Lên đầu trang">↑<span>🌲</span></button>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="/app.js"></script>
 </body>
 </html>

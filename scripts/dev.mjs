@@ -1,3 +1,4 @@
+import { buildStyles } from './styles.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,6 +8,7 @@ import matrixHandler from '../api/matrix.js';
 import configHandler from '../api/config.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+buildStyles(root);
 loadEnv(path.join(root, '.env.local'));
 loadEnv(path.join(root, '.env'));
 
@@ -61,7 +63,7 @@ const server = http.createServer(async (req, res) => {
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'strict-origin-when-cross-origin',
-      'Content-Security-Policy': "default-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+      'Content-Security-Policy': "default-src 'self'; connect-src 'self' https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; img-src 'self' data: https://lh3.googleusercontent.com https://*.googleusercontent.com; style-src 'self'; script-src 'self' https://www.gstatic.com; frame-src https://*.firebaseapp.com https://accounts.google.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
     });
     if (req.method === 'HEAD') return res.end();
     fs.createReadStream(target).pipe(res);

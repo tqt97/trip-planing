@@ -1,25 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CollaborativeRepository } from '../src/data/repository.js';
+import { FirebaseTripRepository } from '../src/data/firebase-repository.js';
 
+class Snap { constructor(id,value){this.id=id;this.value=value} exists(){return this.value!=null} data(){return this.value} }
 class FakeClient {
-  constructor(){this.user={id:'11111111-1111-1111-1111-111111111111'};this.calls=[]}
-  async ensureSession(){return this.user}
-  async rpc(name,args){this.calls.push(['rpc',name,args]);return [{trip_id:'22222222-2222-2222-2222-222222222222',role:'editor'}]}
-  async rest(table,opts={}){this.calls.push(['rest',table,opts]);if(table==='trips')return [{id:'22222222-2222-2222-2222-222222222222',slug:'dalat-2026',name:'Đà Lạt',home_name:'Home',home_lat:11.9,home_lng:108.4}];if(table==='places')return [];if(table==='expenses')return [];if(table==='place_votes')return [];if(table==='trip_members')return [];return []}
-  subscribeTables(){return ()=>{}}
+  constructor({trip=null,member=null}={}){this.user={id:'user-1',email:'ni@example.com',displayName:'Ní'};this.trip=trip;this.member=member;this.writes=[]}
+  async init(){return this} async ensureSession(){return this.user} doc(...s){return s.join('/')} collection(...s){return s.join('/')} serverTimestamp(){return 'SERVER_TIME'}
+  async runTransaction(fn){const tx={get:async(ref)=>ref==='trips/dalat-2026'?new Snap('dalat-2026',this.trip):new Snap('user-1',this.member),set:(ref,data)=>{this.writes.push(['set',ref,data]);if(ref==='trips/dalat-2026')this.trip=data;if(ref.endsWith('/members/user-1'))this.member=data},update:(ref,data)=>{this.writes.push(['update',ref,data]);if(ref==='trips/dalat-2026')this.trip={...this.trip,...data}}};return fn(tx)}
+  async getDoc(){return new Snap('dalat-2026',this.trip)} async getDocs(){return {docs:[]}} async setDoc(ref,data,opts){this.writes.push(['setDoc',ref,data,opts])} async updateDoc(ref,data){this.writes.push(['updateDoc',ref,data])} async deleteDoc(ref){this.writes.push(['deleteDoc',ref])} onSnapshot(){return()=>{}}
 }
 
-test('repository joins shared trip and loads collaboration collections', async()=>{
-  const client=new FakeClient();const repo=new CollaborativeRepository(client,'dalat-2026');const connection=await repo.connect();
-  assert.equal(connection.role,'editor'); assert.equal(repo.canEdit(),true);
-  const data=await repo.loadAll(); assert.equal(data.home.address,'Home'); assert.deepEqual(data.places,[]); assert.deepEqual(data.votes,[]);
-  assert.ok(client.calls.some(c=>c[0]==='rpc'&&c[1]==='join_trip_by_slug'));
-});
-
-test('repository vote writes are scoped to current user and trip', async()=>{
-  const client=new FakeClient();const repo=new CollaborativeRepository(client,'dalat-2026');await repo.connect();
-  await repo.setVote('33333333-3333-3333-3333-333333333333',true);
-  const call=client.calls.find(c=>c[0]==='rest'&&c[1]==='place_votes'&&c[2].method==='POST');
-  assert.equal(call[2].body.user_id,client.user.id); assert.equal(call[2].body.trip_id,repo.tripId);
-});
+test('first Firebase user bootstraps trip and becomes owner',async()=>{const c=new FakeClient(),r=new FirebaseTripRepository(c,{tripSlug:'dalat-2026',tripName:'Đà Lạt',home:{address:'Home',lat:11.9,lng:108.4}});const x=await r.connect();assert.equal(x.role,'owner');assert.equal(c.trip.ownerUid,'user-1');assert.equal(c.member.role,'owner')});
+test('subsequent user joins public Firebase trip as editor',async()=>{const c=new FakeClient({trip:{slug:'dalat-2026',publicJoin:true,ownerUid:'owner-1'}}),r=new FirebaseTripRepository(c,{tripSlug:'dalat-2026'});const x=await r.connect();assert.equal(x.role,'editor');assert.equal(c.member.role,'editor')});
+test('closed Firebase trip rejects new member',async()=>{const c=new FakeClient({trip:{slug:'dalat-2026',publicJoin:false,ownerUid:'owner-1'}}),r=new FirebaseTripRepository(c,{tripSlug:'dalat-2026'});await assert.rejects(()=>r.connect(),/không cho phép/)});
