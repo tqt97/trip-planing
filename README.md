@@ -132,9 +132,9 @@ Ví dụ `.env.local`:
 
 ```env
 APP_ENV=local
-HOME_NAME=Hotel Trường An Hotel
-HOME_LAT=11.9370985
-HOME_LNG=108.4220004
+HOME_NAME=HOME_NAME
+HOME_LAT=HOME_LAT
+HOME_LNG=HOME_LNG
 ```
 
 Mở `http://127.0.0.1:3000` hoặc URL được dev server in ra terminal.
@@ -147,11 +147,11 @@ Các biến tối thiểu:
 APP_ENV=prod
 SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
-DEFAULT_TRIP_SLUG=dalat-2026
+DEFAULT_TRIP_SLUG=your-plan
 
-HOME_NAME=Hotel Trường An Hotel
-HOME_LAT=11.9370985
-HOME_LNG=108.4220004
+HOME_NAME=HOME_NAME
+HOME_LAT=HOME_LAT
+HOME_LNG=HOME_LNG
 ```
 
 Nếu dùng routing:
