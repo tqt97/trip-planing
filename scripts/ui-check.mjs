@@ -6,7 +6,7 @@ const app = fs.readFileSync('app.js','utf8');
 const main = fs.readFileSync('src/app/main.js','utf8');
 const modules = [
   'src/app/ui.js','src/app/storage.js','src/app/radar-view.js','src/app/demo-seed.js','src/app/app-shell.js','src/app/bindings.js',
-  'src/data/supabase-client.js','src/data/repository.js','src/features/common/pagination-view.js','src/features/expenses/expense-view.js','src/features/expenses/expense-controller.js','src/features/checklists/checklist-view.js','src/features/checklists/checklist-controller.js','src/features/places/place-media.js','src/features/album/album-view.js','src/features/album/album-controller.js','src/features/album/album-media.js'
+  'src/data/supabase-client.js','src/data/repository.js','src/app/pwa.js','src/features/timeline/timeline-controller.js','src/features/timeline/timeline-view.js','src/features/expenses/settlement.js','src/features/common/pagination-view.js','src/features/expenses/expense-view.js','src/features/expenses/expense-controller.js','src/features/checklists/checklist-view.js','src/features/checklists/checklist-controller.js','src/features/places/place-media.js','src/features/album/album-view.js','src/features/album/album-controller.js','src/features/album/album-media.js'
 ].map((f)=>[f,fs.readFileSync(f,'utf8')]);
 const assert = (ok, message) => { if (!ok) throw new Error(`UI check failed: ${message}`); };
 const has = (re) => re.test(css);
@@ -18,7 +18,7 @@ assert(html.includes('rel="modulepreload"') && html.indexOf('src="/app.js"') < h
 assert((css.match(/!important/g)||[]).length === 0, 'CSS must not use !important overrides');
 assert(has(/body\s*\{[^}]*overflow-x:\s*clip/s), 'body horizontal overflow guard missing');
 assert(html.includes('class="brand-title"') && html.includes('class="subtitle"') && !html.includes('trip-logo'), 'brand hierarchy must be explicit and logo-free');
-assert(css.includes('@media (max-width: 820px)') && css.includes('@media (max-width: 480px)') && css.includes('@media (max-width: 360px)'), 'mobile breakpoints missing');
+assert(/@media\s*\(max-width:\s*820px\)/.test(css) && /@media\s*\(max-width:\s*480px\)/.test(css) && /@media\s*\(max-width:\s*360px\)/.test(css), 'mobile breakpoints missing');
 assert(has(/dialog\s*\{[^}]*width:\s*100%[^}]*max-width:\s*100dvw[^}]*max-height:\s*92dvh/s), 'mobile dialog viewport guard missing');
 
 assert(html.includes('id="placeCoordsDetails"'), 'coordinates details id missing');
@@ -42,28 +42,42 @@ assert(html.includes('role="button" tabindex="0" aria-expanded="true"'), 'collap
 assert(main.includes("interactive=event.target.closest('button,a,input,select,textarea,label,summary,details')"), 'header collapse must protect nested controls');
 assert(fs.readFileSync('src/app/bindings.js','utf8').includes('OPTIONAL_UI_BIND_SKIPPED') && main.includes('bindScrollControl({'), 'optional navigation controls must use null-safe binding');
 assert(!/document\.querySelector\([^\n;]+\)\.addEventListener/.test(main), 'direct querySelector().addEventListener binding can crash when optional layout controls are absent');
-assert(Buffer.byteLength(css) < 40000, `CSS budget exceeded (${Buffer.byteLength(css)} bytes)`);
+assert(/\.timeline-board\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s.test(css), 'desktop Timeline must render three day columns');
+assert(/\.timeline-events\{[^}]*--tw:[^;]+;[^}]*--rw:[^;]+;[^}]*--rh:[^;]+;[^}]*--tg:[^;]+/s.test(css) && /\.timeline-events:before\{[^}]*left:calc\(var\(--tw\) \+ var\(--tg\) \+ var\(--rh\)\)/s.test(css), 'Timeline rail must use precomputed half-rail geometry for browser-compatible alignment');
+assert(/\.timeline-event-card\{[^}]*border:0[^}]*background:transparent[^}]*box-shadow:none/s.test(css), 'Timeline event content must stay flat and borderless');
+assert(/@media\s*\(max-width:\s*820px\)[\s\S]*?\.timeline-day-tab,\.timeline-day\{display:none\}[\s\S]*?\.timeline-day-tab\.is-active,\.timeline-day\.is-active\{display:block\}/s.test(css), 'mobile Timeline must show only the active day');
+assert(Buffer.byteLength(css) < 41500, `CSS budget exceeded (${Buffer.byteLength(css)} bytes)`);
 assert(Buffer.byteLength(app) < 1000, `bootstrap app.js budget exceeded (${Buffer.byteLength(app)} bytes)`);
 assert(Buffer.byteLength(main) < 36000, `src/app/main.js budget exceeded (${Buffer.byteLength(main)} bytes)`);
 for (const [file, content] of modules) assert(Buffer.byteLength(content) < 18000, `${file} module budget exceeded`);
 const totalJs = Buffer.byteLength(app) + Buffer.byteLength(main) + modules.reduce((sum,[,content])=>sum+Buffer.byteLength(content),0);
-assert(totalJs < 100000, `total browser JS budget exceeded (${totalJs} bytes)`);
-assert(html.includes('id="albumSection"') && html.includes('id="albumLightbox"'), 'Trip Album UI missing');
+assert(totalJs < 110000, `total browser JS budget exceeded (${totalJs} bytes)`);
+assert(html.includes('id="albumSection"') && html.includes('id="albumLightbox"'), 'Image section UI missing');
+assert(!html.includes('TRIP ALBUM') && !html.includes('Album đang trống') && !html.includes('>Lưu album<'), 'User-facing Album wording must stay replaced by Ảnh');
 assert(html.includes('id="peopleCount"') && html.includes('id="checklistSection"') && html.includes('id="placeImage"') && html.includes('id="placeNoteUrl"'), 'v2.6 trip utility UI missing');
 assert(css.includes('.album-strip') && css.includes('.check-completer'), 'v2.7 album/checklist completion styles missing');
 assert(/\.album-strip\s*\{[^}]*grid-template-columns:\s*repeat\(4/.test(css) && /@media\s*\(max-width:\s*820px\)[\s\S]*?\.album-strip\s*\{[^}]*grid-template-columns:\s*repeat\(2/.test(css), 'album must use responsive thumbnail grid instead of horizontal scroller');
 assert(html.includes('class="album-toolbar"') && !html.includes('id="albumImagePreview"'), 'album filter placement or preview removal regression');
 assert(css.includes('.checklist-row') && css.includes('.place-image-preview'), 'v2.6 feature styles missing');
 
-assert(html.includes('id="addAlbumBtn" type="button">Thêm ảnh</button>'), 'Album CTA must say Thêm ảnh');
+assert(html.includes('id="addAlbumBtn" type="button">Thêm ảnh</button>'), 'Image CTA must say Thêm ảnh');
 assert(html.includes('id="expensePagination"') && html.includes('id="albumPagination"'), 'Expense and Album pagination controls missing');
 const compactPagerSource = fs.readFileSync('src/features/common/pagination-view.js', 'utf8');
 const placeViewSource = fs.readFileSync('src/features/places/place-view.js', 'utf8');
 assert(compactPagerSource.includes('page.totalPages > 1') && placeViewSource.includes('page.totalPages > 1'), 'Pagination must stay hidden when content fits on one page');
+assert(/\.pagination\[hidden\]\{[^}]*display:\s*none/s.test(css), 'Pagination hidden attribute must override .pagination display:flex');
 assert(!html.includes('albumLightboxPlaceholder') && !css.includes('album-lightbox-placeholder'), 'unused album lightbox placeholder must stay removed');
-assert(/\.album-toolbar\{[^}]*display:flex[^}]*gap:10px[^}]*min-width:0/s.test(css), 'Album toolbar must keep balanced flex spacing');
-assert(/@media \(max-width:420px\)\{[^}]*\.album-toolbar\{[^}]*gap:6px/s.test(css), 'Album toolbar must stay compact on small phones');
+assert(/\.album-toolbar\{[^}]*margin:14px 20px 10px[^}]*padding:10px 13px[^}]*display:flex[^}]*gap:10px[^}]*min-width:0/s.test(css), 'Image toolbar must keep compact one-row flex spacing');
+assert(!css.includes('.album-head-actions') && !css.includes('grid-auto-columns:min(82vw,286px)'), 'stale carousel-era image CSS must stay removed');
+assert(/@media \(max-width:520px\)\{[^}]*\.album-toolbar\{[^}]*gap:6px/s.test(css), 'Image toolbar must stay compact on phones');
 
+assert(html.includes('id="timelineSection"') && html.includes('id="timelineDialog"'), 'Timeline UI missing');
+assert(/\.timeline-board\{[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/.test(css), 'desktop Timeline must compare three day columns');
+assert(css.includes('.timeline-events:before') && css.includes('.timeline-marker'), 'Timeline must render a visible time rail and event markers');
+assert(/@media\(max-width:820px\)[\s\S]*?\.timeline-day-tab,\.timeline-day\{display:none\}[\s\S]*?\.timeline-day\.is-active\{display:block\}/.test(css), 'mobile Timeline must show one active day at a time');
+assert(fs.readFileSync('src/features/timeline/timeline-controller.js','utf8').includes('timelineWindowDates(dates, activeDate, 3)'), 'Timeline controller must keep a three-day desktop window');
+assert(html.includes('rel="manifest"') && fs.existsSync('manifest.webmanifest') && fs.existsSync('sw.js'), 'PWA manifest/service worker missing');
+assert(fs.readFileSync('src/app/pwa.js','utf8').includes("serviceWorker.register('/sw.js')"), 'PWA registration missing');
 assert(!/<script[^>]+src="https?:\/\//.test(html) && !/<link[^>]+href="https?:\/\//.test(html), 'runtime external CSS/JS dependency detected');
 
 console.log(`ui-check: responsive invariants passed; CSS ${Buffer.byteLength(css)} B, app ${Buffer.byteLength(app)} B, total JS ${totalJs} B, 0 !important`);

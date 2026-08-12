@@ -8,7 +8,9 @@ export function createChecklistController({ els, state, getRepository, getCurren
     const repo = getRepository();
     return !repo || item.visibility === 'public' || item.createdBy === currentUserId();
   };
-  function render() { renderChecklists(els, state.checklists || [], currentUserId(), getMembers?.() || []); }
+  function render() {
+    renderChecklists(els, state.checklists || [], state.checklistCompletions || [], currentUserId(), getMembers?.() || []);
+  }
   function open(item = null) {
     els.checklistForm.reset(); els.checklistMessage.textContent = ''; els.checklistId.value = item?.id || '';
     els.checklistDialogTitle.textContent = item ? 'Sửa checklist' : 'Thêm mục checklist';
@@ -18,7 +20,7 @@ export function createChecklistController({ els, state, getRepository, getCurren
   async function save(event) {
     event.preventDefault(); els.checklistMessage.textContent = '';
     const repo = getRepository(); const existing = state.checklists.find(x => x.id === els.checklistId.value);
-    const input = sanitizeChecklist({ id: els.checklistId.value || (repo && crypto.randomUUID ? crypto.randomUUID() : undefined), title: els.checklistTitle.value, category: els.checklistCategory.value, visibility: els.checklistVisibility.value, note: els.checklistNote.value, done: existing?.done || false, createdBy: existing?.createdBy || currentUserId(), createdAt: existing?.createdAt });
+    const input = sanitizeChecklist({ id: els.checklistId.value || (repo && crypto.randomUUID ? crypto.randomUUID() : undefined), title: els.checklistTitle.value, category: els.checklistCategory.value, visibility: els.checklistVisibility.value, note: els.checklistNote.value, createdBy: existing?.createdBy || currentUserId(), createdAt: existing?.createdAt });
     const errors = validateChecklist(input); if (errors.length) { els.checklistMessage.textContent = errors[0]; return; }
     if (existing && !canEdit(existing)) { els.checklistMessage.textContent = 'Bạn không có quyền sửa checklist private của người khác.'; return; }
     setBusy(els.saveChecklistBtn, true, 'Đang lưu…');
@@ -33,16 +35,27 @@ export function createChecklistController({ els, state, getRepository, getCurren
   async function action(event) {
     const btn = event.target.closest('[data-check-action]'); if (!btn) return;
     const row = btn.closest('[data-checklist-id]'); const item = state.checklists.find(x => x.id === row?.dataset.checklistId); if (!item) return;
-    if (!canEdit(item)) return toast('Checklist private này chỉ chủ sở hữu được sửa.');
+    if (!canEdit(item)) return toast('Checklist private này chỉ chủ sở hữu được thao tác.');
     if (btn.dataset.checkAction === 'edit') return open(item);
     const repo = getRepository();
     if (btn.dataset.checkAction === 'toggle') {
-      const nextDone=!item.done; const updated = sanitizeChecklist({ ...item, done: nextDone, completedBy: nextDone ? currentUserId() : '', completedAt: nextDone ? new Date().toISOString() : null });
-      try { const saved = repo ? await repo.saveChecklist(updated) : updated; state.checklists[state.checklists.findIndex(x => x.id === item.id)] = saved; persistState(state); render(); } catch (error) { toast(`Không cập nhật checklist: ${error.message}`); }
+      const userId = currentUserId();
+      const alreadyDone = (state.checklistCompletions || []).some(x => x.checklistId === item.id && x.userId === userId);
+      try {
+        if (repo) await repo.setChecklistCompletion(item.id, !alreadyDone);
+        else if (alreadyDone) state.checklistCompletions = (state.checklistCompletions || []).filter(x => !(x.checklistId === item.id && x.userId === userId));
+        else state.checklistCompletions = [...(state.checklistCompletions || []), { checklistId: item.id, userId, completedAt: new Date().toISOString() }];
+        persistState(state); render();
+      } catch (error) { toast(`Không cập nhật checklist: ${error.message}`); }
       return;
     }
     if (btn.dataset.checkAction === 'delete' && confirm(`Xóa “${item.title}”?`)) {
-      try { if (repo) await repo.deleteChecklist(item.id); state.checklists = state.checklists.filter(x => x.id !== item.id); persistState(state); render(); } catch (error) { toast(`Không xóa được checklist: ${error.message}`); }
+      try {
+        if (repo) await repo.deleteChecklist(item.id);
+        state.checklists = state.checklists.filter(x => x.id !== item.id);
+        state.checklistCompletions = (state.checklistCompletions || []).filter(x => x.checklistId !== item.id);
+        persistState(state); render();
+      } catch (error) { toast(`Không xóa được checklist: ${error.message}`); }
     }
   }
   return { render, open, save, action, canEdit };

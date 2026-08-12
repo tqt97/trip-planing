@@ -6,7 +6,7 @@ export function buildStyles(root = process.cwd()) {
   const files = fs.readdirSync(sourceDir).filter(name => name.endsWith('.css')).sort();
   if (!files.length) throw new Error('No CSS sources found in styles/');
   const readable = files.map(name => fs.readFileSync(path.join(sourceDir, name), 'utf8').trim()).join('\n');
-  const output = readable.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').trim();
+  const output = readable.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').replace(/\{\s+/g,'{').replace(/\s+\}/g,'}').replace(/;\s+/g,';').replace(/;}/g,'}').replace(/,\s+/g,',').replace(/:\s+/g,':').replace(/\s*([>~])\s*/g,'$1').replace(/\(\s+/g,'(').replace(/\s+\)/g,')').replace(/([:(, ])0\.(\d+)/g,'$1.$2').replace(/:\s*0(?:px|rem|em|vh|vw|dvh|dvw|%)/g,':0').replace(/}\s+/g,'}').replace(/\s+{/g,'{').trim();
   if ((output.match(/!important/g) || []).length) throw new Error('CSS policy: !important is not allowed');
   fs.writeFileSync(path.join(root, 'styles.css'), output);
   return { files, bytes: Buffer.byteLength(output) };

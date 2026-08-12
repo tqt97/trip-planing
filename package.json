@@ -1,6 +1,6 @@
 {
   "name": "dalat-nearby-planner",
-  "version": "2.7.3",
+  "version": "2.9.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "build": "node scripts/build.mjs",
     "smoke": "node scripts/smoke.mjs",
     "monkey": "node scripts/monkey.mjs",
-    "quality": "npm run lint && npm test && npm run ui && npm run perf && npm run build && npm run smoke && npm run monkey",
+    "quality": "npm run lint && npm test && npm run build && npm run ui && npm run perf && npm run smoke && npm run monkey",
     "dev": "node scripts/dev.mjs",
     "ui": "node scripts/ui-check.mjs",
     "perf": "node scripts/perf-check.mjs",

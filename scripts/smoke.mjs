@@ -12,17 +12,18 @@ const ui = fs.readFileSync('src/app/ui.js', 'utf8');
 const core = fs.readFileSync('src/core.js', 'utf8');
 const migration = fs.readFileSync('supabase/migrations/001_v2_collaboration.sql', 'utf8');
 const featureMigration = fs.readFileSync('supabase/migrations/002_trip_features.sql', 'utf8');
+const timelineMigration = fs.readFileSync('supabase/migrations/005_timeline_expense_settlement.sql', 'utf8');
 const resetSql = fs.readFileSync('supabase/RESET_ALL.sql', 'utf8');
 const cssSources = ['styles/00-foundation.css','styles/10-responsive.css','styles/20-collaboration.css'];
 const hasCss = (re) => re.test(css);
 
-for (const id of ['homeTitle','addBtn','placesList','placeDialog','homeDialog','radiusSelect','pageSizeSelect','pagination','prevPageBtn','nextPageBtn','radarSvg','radarSummary','radarEmpty','radarRadiusSelect','radarCategorySelect','expenseSection','expenseList','expenseTotal','expenseAverage','peopleCount','expenseDialog','expenseForm','checklistSection','checklistList','checklistDialog','placeImage','placeNoteUrl','backToTop']) {
+for (const id of ['homeTitle','addBtn','placesList','placeDialog','homeDialog','radiusSelect','pageSizeSelect','pagination','prevPageBtn','nextPageBtn','radarSvg','radarSummary','radarEmpty','radarRadiusSelect','radarCategorySelect','expenseSection','expenseList','expenseTotal','expenseAverage','peopleCount','expenseDialog','expenseForm','timelineSection','timelineList','timelineDialog','checklistSection','checklistList','checklistDialog','placeImage','placeNoteUrl','backToTop']) {
   if (!html.includes(`id="${id}"`)) throw new Error(`Smoke failed: missing #${id}`);
 }
-for (const symbol of ['filterAndSortPlaces','filterRadarPlaces','buildRadarPoints','googleMapsCoordinateUrl','sanitizeExpense','totalExpenses','sanitizeChecklist','averageExpensePerPerson']) {
+for (const symbol of ['filterAndSortPlaces','filterRadarPlaces','buildRadarPoints','googleMapsCoordinateUrl','sanitizeExpense','totalExpenses','sanitizeChecklist','sanitizeTimelineItem','averageExpensePerPerson']) {
   if (!core.includes(symbol)) throw new Error(`Smoke failed: core missing ${symbol}`);
 }
-for (const file of ['src/app/radar-view.js','src/app/storage.js','src/app/ui.js','src/data/supabase-client.js','src/data/repository.js','supabase/RESET_ALL.sql','supabase/migrations/001_v2_collaboration.sql','supabase/migrations/002_trip_features.sql','data/default-places.json','api/route.js','api/matrix.js','api/config.js']) {
+for (const file of ['src/app/radar-view.js','src/app/storage.js','src/app/ui.js','src/data/supabase-client.js','src/data/repository.js','supabase/RESET_ALL.sql','supabase/migrations/001_v2_collaboration.sql','supabase/migrations/002_trip_features.sql','supabase/migrations/005_timeline_expense_settlement.sql','data/default-places.json','api/route.js','api/matrix.js','api/config.js']) {
   if (!fs.existsSync(file)) throw new Error(`Smoke failed: missing ${file}`);
 }
 JSON.parse(fs.readFileSync('vercel.json','utf8'));
@@ -54,8 +55,8 @@ if (!hasCss(/\.mobile-fab\s*\{[^}]*right:\s*14px[^}]*bottom:\s*calc\(76px/s)) th
 if (!hasCss(/\.stats article\s*\{[^}]*min-width:\s*0[^}]*min-height:\s*62px/s)) throw new Error('Smoke failed: compact stat cards missing');
 if (!hasCss(/@media\s*\(max-width:\s*360px\)[\s\S]*?\.stats\s*\{[^}]*grid-template-columns:\s*repeat\(2/s)) throw new Error('Smoke failed: small-phone stats fallback missing');
 if (!hasCss(/@media\s*\(max-width:\s*820px\)[\s\S]*?\.places-list,\.expense-list,\.checklist-list\{[^}]*max-height:\s*none[^}]*overflow:\s*visible/s)) throw new Error('Smoke failed: mobile lists must use natural page scroll');
-if (!css.includes('@media (max-width: 360px)')) throw new Error('Smoke failed: small-phone breakpoint missing');
-if (!css.includes('font-size: 40px')) throw new Error('Smoke failed: mobile H1 40px guard missing');
+if (!/@media\s*\(max-width:\s*360px\)/.test(css)) throw new Error('Smoke failed: small-phone breakpoint missing');
+if (!/font-size:\s*40px/.test(css)) throw new Error('Smoke failed: mobile H1 40px guard missing');
 if (!hasCss(/body\s*\{[^}]*overflow-x:\s*clip/s)) throw new Error('Smoke failed: horizontal overflow guard missing');
 
 // CSS/JS cleanliness. Source files are checked separately so formatting does not create false failures.
@@ -87,4 +88,6 @@ for (const fragment of ['property="og:title"','name="twitter:card"','type="appli
 }
 if (html.includes('id="mobileImportInput"')) throw new Error('Smoke failed: mobile Import returned to bottom navigation');
 
+if (!html.includes('rel=\"manifest\"') || !fs.existsSync('sw.js')) throw new Error('Smoke failed: PWA assets missing');
+if (!timelineMigration.includes('trip_timeline_items')) throw new Error('Smoke failed: timeline migration missing');
 console.log(`smoke: responsive layout, clean CSS/JS modules, clean Supabase reset/migration, maps links, forms, SEO and mobile guards passed (${importantCount} !important)`);

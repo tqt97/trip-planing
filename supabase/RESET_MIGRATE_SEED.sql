@@ -1,6 +1,3 @@
--- DALAT NEARBY PLANNER v2.6 - ONE SHOT CLEAN REBUILD
--- WARNING: deletes app data but preserves auth.users.
-
 -- DALAT NEARBY PLANNER v2.3 - RESET SHARED APP SCHEMA
 -- WARNING: This deletes all app data in public.* tables below.
 -- It does NOT delete Supabase Auth users in auth.users.
@@ -11,10 +8,13 @@ begin;
 drop trigger if exists on_auth_user_created on auth.users;
 
 -- Drop app tables. CASCADE removes policies, FK dependencies and publication memberships.
-delete from storage.objects where bucket_id = 'place-images';
-delete from storage.buckets where id = 'place-images';
+delete from storage.objects where bucket_id in ('place-images','trip-album');
+delete from storage.buckets where id in ('place-images','trip-album');
 
+drop table if exists public.trip_album_items cascade;
+drop table if exists public.checklist_completions cascade;
 drop table if exists public.checklists cascade;
+drop table if exists public.trip_timeline_items cascade;
 drop table if exists public.place_votes cascade;
 drop table if exists public.expenses cascade;
 drop table if exists public.places cascade;
@@ -498,7 +498,7 @@ commit;
 begin;
 
 alter table public.trips
-  add column if not exists people_count integer not null default 4
+  add column if not exists people_count integer not null default 2
   check (people_count between 1 and 50);
 
 alter table public.places
@@ -636,35 +636,6 @@ using (
 commit;
 
 
--- Default shared Trip. Edit these values if your Vercel DEFAULT_TRIP_SLUG/Home differs.
-insert into public.trips (
-  slug,
-  name,
-  home_name,
-  home_lat,
-  home_lng,
-  public_join,
-  people_count
-)
-values (
-  'dalat-2026',
-  'Đà Lạt 2026',
-  'Hotel Trường An Hotel',
-  11.9370985,
-  108.4220004,
-  true,
-  4
-)
-on conflict (slug) do update
-set name = excluded.name,
-    home_name = excluded.home_name,
-    home_lat = excluded.home_lat,
-    home_lng = excluded.home_lng,
-    public_join = excluded.public_join,
-    people_count = excluded.people_count,
-    updated_at = now();
-
-
 -- DALAT NEARBY PLANNER v2.7 - TRIP ALBUM + CHECKLIST COMPLETION ACTOR
 begin;
 
@@ -749,3 +720,157 @@ create policy trip_album_editor_delete on storage.objects for delete to authenti
 
 commit;
 
+
+-- DALAT NEARBY PLANNER v2.8 - PER-USER CHECKLIST COMPLETIONS
+
+create table if not exists public.checklist_completions (
+  trip_id uuid not null references public.trips(id) on delete cascade,
+  checklist_id uuid not null references public.checklists(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  completed_at timestamptz not null default now(),
+  primary key (checklist_id, user_id)
+);
+
+create index if not exists checklist_completions_trip_idx
+  on public.checklist_completions(trip_id, checklist_id, completed_at asc);
+
+alter table public.checklist_completions enable row level security;
+
+drop policy if exists checklist_completions_visible_select on public.checklist_completions;
+create policy checklist_completions_visible_select
+on public.checklist_completions for select to authenticated
+using (
+  public.is_trip_member(public.checklist_completions.trip_id)
+  and exists (
+    select 1
+    from public.checklists as c
+    where c.id = public.checklist_completions.checklist_id
+      and c.trip_id = public.checklist_completions.trip_id
+      and (c.visibility = 'public' or c.created_by = auth.uid())
+  )
+);
+
+drop policy if exists checklist_completions_self_insert on public.checklist_completions;
+create policy checklist_completions_self_insert
+on public.checklist_completions for insert to authenticated
+with check (
+  public.checklist_completions.user_id = auth.uid()
+  and public.is_trip_member(public.checklist_completions.trip_id)
+  and exists (
+    select 1
+    from public.checklists as c
+    where c.id = public.checklist_completions.checklist_id
+      and c.trip_id = public.checklist_completions.trip_id
+      and (c.visibility = 'public' or c.created_by = auth.uid())
+  )
+);
+
+drop policy if exists checklist_completions_self_delete on public.checklist_completions;
+create policy checklist_completions_self_delete
+on public.checklist_completions for delete to authenticated
+using (
+  public.checklist_completions.user_id = auth.uid()
+  and public.is_trip_member(public.checklist_completions.trip_id)
+  and exists (
+    select 1
+    from public.checklists as c
+    where c.id = public.checklist_completions.checklist_id
+      and c.trip_id = public.checklist_completions.trip_id
+      and (c.visibility = 'public' or c.created_by = auth.uid())
+  )
+);
+
+revoke all on public.checklist_completions from anon, public;
+grant select, insert, delete on public.checklist_completions to authenticated;
+
+alter table public.checklist_completions replica identity full;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'checklist_completions'
+  ) then
+    alter publication supabase_realtime add table public.checklist_completions;
+  end if;
+end $$;
+
+-- Migrate legacy single-user completion history if present.
+insert into public.checklist_completions (trip_id, checklist_id, user_id, completed_at)
+select c.trip_id, c.id, c.completed_by, coalesce(c.completed_at, c.updated_at, now())
+from public.checklists as c
+where c.done = true
+  and c.completed_by is not null
+on conflict (checklist_id, user_id) do nothing;
+
+-- Legacy shared completion trigger is no longer used.
+drop trigger if exists checklists_capture_completion on public.checklists;
+
+
+
+-- v2.9 Timeline + expense settlement
+alter table public.expenses add column if not exists participants text[] not null default '{}'::text[];
+
+create table if not exists public.trip_timeline_items (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid not null references public.trips(id) on delete cascade,
+  day_date date not null,
+  start_time time not null default '08:00',
+  title text not null check (char_length(title) between 2 and 180),
+  place_id uuid references public.places(id) on delete set null,
+  place_name text not null default '',
+  note text not null default '',
+  created_by uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_trip_timeline_items_trip_day_time on public.trip_timeline_items(trip_id, day_date, start_time);
+alter table public.trip_timeline_items enable row level security;
+
+drop policy if exists "timeline members can read" on public.trip_timeline_items;
+create policy "timeline members can read" on public.trip_timeline_items for select to authenticated
+using (public.is_trip_member(public.trip_timeline_items.trip_id));
+drop policy if exists "timeline editors can insert" on public.trip_timeline_items;
+create policy "timeline editors can insert" on public.trip_timeline_items for insert to authenticated
+with check (public.can_edit_trip(public.trip_timeline_items.trip_id) and public.trip_timeline_items.created_by = auth.uid());
+drop policy if exists "timeline editors can update" on public.trip_timeline_items;
+create policy "timeline editors can update" on public.trip_timeline_items for update to authenticated
+using (public.can_edit_trip(public.trip_timeline_items.trip_id)) with check (public.can_edit_trip(public.trip_timeline_items.trip_id));
+drop policy if exists "timeline editors can delete" on public.trip_timeline_items;
+create policy "timeline editors can delete" on public.trip_timeline_items for delete to authenticated
+using (public.can_edit_trip(public.trip_timeline_items.trip_id));
+
+grant select, insert, update, delete on public.trip_timeline_items to authenticated;
+
+do $$ begin alter publication supabase_realtime add table public.trip_timeline_items; exception when duplicate_object then null; end $$;
+
+
+-- Default shared Trip. Edit these values if your Vercel DEFAULT_TRIP_SLUG/Home differs.
+insert into public.trips (
+  slug,
+  name,
+  home_name,
+  home_lat,
+  home_lng,
+  public_join,
+  people_count
+)
+values (
+  'dalat-2026',
+  'Đà Lạt 2026',
+  'Hotel Trường An Hotel',
+  11.9370985,
+  108.4220004,
+  true,
+  4
+)
+on conflict (slug) do update
+set name = excluded.name,
+    home_name = excluded.home_name,
+    home_lat = excluded.home_lat,
+    home_lng = excluded.home_lng,
+    public_join = excluded.public_join,
+    people_count = excluded.people_count,
+    updated_at = now();

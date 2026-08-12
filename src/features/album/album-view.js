@@ -17,14 +17,14 @@ export function renderAlbum(els, rawItems = [], filter = 'all', requestedPage = 
 }
 
 export function fillAlbumLightbox(els, item) {
-  els.albumLightboxTitle.textContent = item.title || 'Trip Album';
+  els.albumLightboxTitle.textContent = item.title || 'Ảnh chuyến đi';
   els.albumLightboxStatus.textContent = STATUS_LABELS[item.status] || item.status;
   els.albumLightboxNote.textContent = item.note || '';
   els.albumLightboxNote.hidden = !item.note;
   els.albumLightboxLink.href = item.noteUrl || '#';
   els.albumLightboxLink.hidden = !item.noteUrl;
   els.albumLightboxImage.src = item.imageUrl || '';
-  els.albumLightboxImage.alt = item.title || 'Ảnh album chuyến đi';
+  els.albumLightboxImage.alt = item.title || 'Ảnh chuyến đi';
   els.albumLightboxImage.hidden = !item.imageUrl;
 }
 
@@ -34,7 +34,7 @@ function albumCard(item) {
   article.dataset.albumId = item.id;
   const open = document.createElement('button'); open.type = 'button'; open.className = 'album-open'; open.dataset.albumAction = 'view'; open.setAttribute('aria-label', `Xem ${item.title}`);
   const media = document.createElement('div'); media.className = 'album-media';
-  if (item.imageUrl) { const img = document.createElement('img'); img.loading = 'lazy'; img.decoding = 'async'; img.src = item.imageUrl; img.alt = item.title || 'Ảnh album'; media.append(img); }
+  if (item.imageUrl) { const img = document.createElement('img'); img.loading = 'lazy'; img.decoding = 'async'; img.src = item.imageUrl; img.alt = item.title || 'Ảnh chuyến đi'; media.append(img); }
   else { const placeholder = document.createElement('div'); placeholder.className = 'album-note-placeholder'; placeholder.textContent = item.noteUrl ? '🔗' : '📝'; media.append(placeholder); }
   const status = document.createElement('span'); status.className = 'album-status'; status.textContent = STATUS_LABELS[item.status] || item.status; media.append(status);
   const copy = document.createElement('div'); copy.className = 'album-copy';

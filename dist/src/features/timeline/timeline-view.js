@@ -1,0 +1,4 @@
+export function groupTimelineDays(a=[]){const m=new Map;for(const x of [...a].sort((x,y)=>`${x.date||''}T${x.time||''}`.localeCompare(`${y.date||''}T${y.time||''}`))){const d=String(x?.date||'');if(d)(m.get(d)||m.set(d,[]).get(d)).push(x)}return[...m].map(([date,items])=>({date,items}))}
+export function pickActiveTimelineDate(a=[],n=new Date){if(!a.length)return'';const t=localDateKey(n);return a.includes(t)?t:(a.find(d=>d>=t)||a.at(-1))}
+export function timelineWindowDates(a=[],d='',s=3){if(!a.length||s<1)return[];if(a.length<=s)return[...a];const i=Math.max(0,a.indexOf(d)),p=Math.max(0,Math.min(i-Math.floor((s-1)/2),a.length-s));return a.slice(p,p+s)}
+export function localDateKey(d=new Date){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}

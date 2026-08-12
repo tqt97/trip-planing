@@ -21,6 +21,7 @@ import {
   sanitizeAlbumItem,
   validateAlbumItem,
   sanitizeChecklist,
+  sanitizeChecklistCompletion,
   sanitizeExpense,
   sanitizeHome,
   sanitizePlace,
@@ -218,16 +219,18 @@ test('trip people count and per-person expense average are bounded', () => {
   assert.equal(averageExpensePerPerson(expenses,4),100000);
 });
 
-test('checklist sanitization preserves public/private semantics and export/import', () => {
-  const item=sanitizeChecklist({title:'  Mang áo ấm ',category:'prepare',visibility:'private',done:true,note:'  tối lạnh '});
+test('checklist sanitization preserves public/private semantics and per-user completions in export/import', () => {
+  const item=sanitizeChecklist({id:'check-1',title:'  Mang áo ấm ',category:'prepare',visibility:'private',note:'  tối lạnh '});
+  const completion=sanitizeChecklistCompletion({checklistId:item.id,userId:'user-a',completedAt:'2026-08-12T00:00:00Z'});
   assert.equal(item.title,'Mang áo ấm');
   assert.equal(item.visibility,'private');
-  assert.equal(item.done,true);
   assert.deepEqual(validateChecklist(item),[]);
-  const restored=importState(exportState({home:sanitizeHome({}),places:[],expenses:[],tripSettings:{peopleCount:4},checklists:[item]}));
+  const restored=importState(exportState({home:sanitizeHome({}),places:[],expenses:[],tripSettings:{peopleCount:4},checklists:[item],checklistCompletions:[completion]}));
   assert.equal(restored.tripSettings.peopleCount,4);
   assert.equal(restored.checklists.length,1);
   assert.equal(restored.checklists[0].title,'Mang áo ấm');
+  assert.equal(restored.checklistCompletions.length,1);
+  assert.equal(restored.checklistCompletions[0].userId,'user-a');
 });
 
 test('place keeps safe note URL and local image data URL', () => {
@@ -251,4 +254,22 @@ test('trip album sanitizes note links and survives export/import', () => {
 test('trip album requires at least image, link or note', () => {
   const item=sanitizeAlbumItem({title:'Ảnh đẹp',status:'reference'});
   assert.ok(validateAlbumItem(item).length > 0);
+});
+
+test('timeline sanitization sorts safely and survives export/import', async () => {
+  const { sanitizeTimelineItem, validateTimelineItem } = await import('../src/core.js');
+  const item=sanitizeTimelineItem({date:'2026-08-15',time:'18:30',title:' Chợ đêm ',placeId:'p1',placeName:'Chợ Đà Lạt'});
+  assert.equal(item.title,'Chợ đêm');
+  assert.equal(item.time,'18:30');
+  assert.deepEqual(validateTimelineItem(item),[]);
+  const restored=importState(exportState({home:sanitizeHome({}),places:[],expenses:[],timeline:[item]}));
+  assert.equal(restored.timeline.length,1);
+  assert.equal(restored.timeline[0].date,'2026-08-15');
+});
+
+test('expense participants are sanitized and preserved', () => {
+  const expense=sanitizeExpense({payer:'An',amountVnd:120000,participants:['An',' Bình ','An','Chi']});
+  assert.deepEqual(expense.participants,['An','Bình','Chi']);
+  const restored=importState(exportState({home:sanitizeHome({}),places:[],expenses:[expense]}));
+  assert.deepEqual(restored.expenses[0].participants,['An','Bình','Chi']);
 });

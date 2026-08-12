@@ -5,6 +5,7 @@ export const EXPENSE_CATEGORIES = ['food', 'cafe', 'transport', 'attraction', 's
 export const CHECKLIST_CATEGORIES = ['prepare', 'during'];
 export const CHECKLIST_VISIBILITIES = ['public', 'private'];
 export const ALBUM_STATUSES = ['reference', 'want', 'visited'];
+export const TIMELINE_PERIODS = ['morning','noon','afternoon','evening'];
 
 export function uid(prefix = 'id') {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -48,13 +49,19 @@ export function sanitizeChecklist(input = {}) {
     title: normalizeText(input.title, 180),
     category: CHECKLIST_CATEGORIES.includes(input.category) ? input.category : 'prepare',
     visibility: CHECKLIST_VISIBILITIES.includes(input.visibility) ? input.visibility : 'public',
-    done: Boolean(input.done),
     note: normalizeText(input.note, 500),
     createdBy: normalizeText(input.createdBy ?? input.created_by, 80),
-    completedBy: normalizeText(input.completedBy ?? input.completed_by, 80),
-    completedAt: validIso(input.completedAt ?? input.completed_at),
     createdAt: validIso(input.createdAt ?? input.created_at) || new Date().toISOString(),
     updatedAt: validIso(input.updatedAt ?? input.updated_at) || new Date().toISOString()
+  };
+}
+
+
+export function sanitizeChecklistCompletion(input = {}) {
+  return {
+    checklistId: normalizeText(input.checklistId ?? input.checklist_id, 80),
+    userId: normalizeText(input.userId ?? input.user_id, 80),
+    completedAt: validIso(input.completedAt ?? input.completed_at) || new Date().toISOString()
   };
 }
 
@@ -81,8 +88,32 @@ export function sanitizeAlbumItem(input = {}) {
 
 export function validateAlbumItem(item) {
   const errors = [];
-  if (!item.title || item.title.length < 2) errors.push('Album cần tiêu đề ít nhất 2 ký tự.');
-  if (!item.imageUrl && !item.noteUrl && !item.note) errors.push('Thêm ảnh, link tham khảo hoặc ghi chú cho album.');
+  if (!item.title || item.title.length < 2) errors.push('Ảnh / link cần tiêu đề ít nhất 2 ký tự.');
+  if (!item.imageUrl && !item.noteUrl && !item.note) errors.push('Thêm ảnh, link tham khảo hoặc ghi chú.');
+  return errors;
+}
+
+
+export function sanitizeTimelineItem(input = {}) {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(input.date || '')) ? String(input.date) : new Date().toISOString().slice(0,10);
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(input.time || '')) ? String(input.time) : '08:00';
+  return {
+    id: normalizeText(input.id, 80) || uid('timeline'),
+    date,
+    time,
+    title: normalizeText(input.title, 180),
+    placeId: normalizeText(input.placeId ?? input.place_id, 80),
+    placeName: normalizeText(input.placeName ?? input.place_name, 160),
+    note: normalizeText(input.note, 500),
+    createdAt: validIso(input.createdAt ?? input.created_at) || new Date().toISOString(),
+    updatedAt: validIso(input.updatedAt ?? input.updated_at) || new Date().toISOString()
+  };
+}
+export function validateTimelineItem(item) {
+  const errors = [];
+  if (!item.title || item.title.length < 2) errors.push('Lịch trình cần tiêu đề ít nhất 2 ký tự.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(item.date)) errors.push('Ngày lịch trình không hợp lệ.');
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(item.time)) errors.push('Giờ lịch trình không hợp lệ.');
   return errors;
 }
 
@@ -93,6 +124,7 @@ export function sanitizeExpense(input = {}) {
     category: EXPENSE_CATEGORIES.includes(input.category) ? input.category : 'other',
     amountVnd: positiveIntegerOrNull(input.amountVnd),
     note: normalizeText(input.note, 300),
+    participants: [...new Set((Array.isArray(input.participants) ? input.participants : String(input.participants || '').split(',')).map(x => normalizeText(x, 120)).filter(Boolean))].slice(0, 50),
     createdAt: validIso(input.createdAt) || new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -346,13 +378,18 @@ export function groupNearby(places, thresholdMeters = 1800) {
 }
 
 export function exportState(state) {
-  return JSON.stringify({ version: 5, exportedAt: new Date().toISOString(), home: sanitizeHome(state.home), tripSettings: sanitizeTripSettings(state.tripSettings), places: Array.isArray(state.places) ? state.places.map(sanitizePlace) : [], expenses: Array.isArray(state.expenses) ? state.expenses.map(sanitizeExpense) : [], checklists: Array.isArray(state.checklists) ? state.checklists.map(sanitizeChecklist) : [], album: Array.isArray(state.album) ? state.album.map(sanitizeAlbumItem) : [] }, null, 2);
+  return JSON.stringify({ version: 7, exportedAt: new Date().toISOString(), home: sanitizeHome(state.home), tripSettings: sanitizeTripSettings(state.tripSettings), places: Array.isArray(state.places) ? state.places.map(sanitizePlace) : [], expenses: Array.isArray(state.expenses) ? state.expenses.map(sanitizeExpense) : [], checklists: Array.isArray(state.checklists) ? state.checklists.map(sanitizeChecklist) : [], checklistCompletions: Array.isArray(state.checklistCompletions) ? state.checklistCompletions.map(sanitizeChecklistCompletion).filter(x => x.checklistId && x.userId) : [], album: Array.isArray(state.album) ? state.album.map(sanitizeAlbumItem) : [], timeline: Array.isArray(state.timeline) ? state.timeline.map(sanitizeTimelineItem) : [] }, null, 2);
 }
 
 export function importState(text) {
   const parsed = JSON.parse(text);
   if (!parsed || typeof parsed !== 'object') throw new Error('File không hợp lệ.');
-  return { home: sanitizeHome(parsed.home ?? {}), tripSettings: sanitizeTripSettings(parsed.tripSettings ?? {}), places: Array.isArray(parsed.places) ? parsed.places.slice(0, 1000).map(sanitizePlace) : [], expenses: Array.isArray(parsed.expenses) ? parsed.expenses.slice(0, 5000).map(sanitizeExpense) : [], checklists: Array.isArray(parsed.checklists) ? parsed.checklists.slice(0, 5000).map(sanitizeChecklist) : [], album: Array.isArray(parsed.album) ? parsed.album.slice(0, 2000).map(sanitizeAlbumItem) : [] };
+  const checklists = Array.isArray(parsed.checklists) ? parsed.checklists.slice(0, 5000).map(sanitizeChecklist) : [];
+  let checklistCompletions = Array.isArray(parsed.checklistCompletions) ? parsed.checklistCompletions.slice(0, 20000).map(sanitizeChecklistCompletion).filter(x => x.checklistId && x.userId) : [];
+  if (!checklistCompletions.length && Array.isArray(parsed.checklists)) {
+    checklistCompletions = parsed.checklists.slice(0, 5000).filter(x => x?.done && (x.completedBy || x.completed_by)).map(x => sanitizeChecklistCompletion({ checklistId: x.id, userId: x.completedBy || x.completed_by, completedAt: x.completedAt || x.completed_at }));
+  }
+  return { home: sanitizeHome(parsed.home ?? {}), tripSettings: sanitizeTripSettings(parsed.tripSettings ?? {}), places: Array.isArray(parsed.places) ? parsed.places.slice(0, 1000).map(sanitizePlace) : [], expenses: Array.isArray(parsed.expenses) ? parsed.expenses.slice(0, 5000).map(sanitizeExpense) : [], checklists, checklistCompletions, album: Array.isArray(parsed.album) ? parsed.album.slice(0, 2000).map(sanitizeAlbumItem) : [], timeline: Array.isArray(parsed.timeline) ? parsed.timeline.slice(0, 1000).map(sanitizeTimelineItem) : [] };
 }
 
 function finiteOrNull(value, min, max) { if (value === null || value === undefined || value === '') return null; const n = Number(value); return Number.isFinite(n) && n >= min && n <= max ? n : null; }

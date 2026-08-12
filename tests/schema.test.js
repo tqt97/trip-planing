@@ -5,6 +5,8 @@ import fs from 'node:fs';
 const sql = fs.readFileSync('supabase/migrations/001_v2_collaboration.sql', 'utf8');
 const featuresSql = fs.readFileSync('supabase/migrations/002_trip_features.sql', 'utf8');
 const albumSql = fs.readFileSync('supabase/migrations/003_album_checklist_completion.sql', 'utf8');
+const completionSql = fs.readFileSync('supabase/migrations/004_checklist_per_user_completion.sql', 'utf8');
+const timelineSql = fs.readFileSync('supabase/migrations/005_timeline_expense_settlement.sql', 'utf8');
 const resetSql = fs.readFileSync('supabase/RESET_ALL.sql', 'utf8');
 const seed = fs.readFileSync('scripts/db-seed.mjs', 'utf8');
 
@@ -84,4 +86,28 @@ test('v2.7 album migration secures shared album and checklist completion actor',
   assert.match(albumSql,/alter publication supabase_realtime add table public\.trip_album_items/i);
   assert.match(resetSql,/drop table if exists public\.trip_album_items cascade/i);
   assert.match(resetSql,/trip-album/i);
+});
+
+
+test('v2.8 checklist completion migration stores completion per user with self-only writes', () => {
+  assert.match(completionSql,/create table if not exists public\.checklist_completions/i);
+  assert.match(completionSql,/primary key \(checklist_id, user_id\)/i);
+  assert.match(completionSql,/user_id = auth\.uid\(\)/i);
+  assert.match(completionSql,/checklist_completions_self_insert/i);
+  assert.match(completionSql,/checklist_completions_self_delete/i);
+  assert.match(completionSql,/visibility = 'public' or c\.created_by = auth\.uid\(\)/i);
+  assert.match(completionSql,/alter publication supabase_realtime add table public\.checklist_completions/i);
+  assert.match(completionSql,/insert into public\.checklist_completions[\s\S]*?c\.completed_by/i);
+  assert.match(resetSql,/drop table if exists public\.checklist_completions cascade/i);
+});
+
+
+test('v2.9 timeline migration secures timeline and expense split participants',()=>{
+  assert.match(timelineSql,/add column if not exists participants text\[\]/i);
+  assert.match(timelineSql,/create table if not exists public\.trip_timeline_items/i);
+  assert.match(timelineSql,/alter table public\.trip_timeline_items enable row level security/i);
+  assert.match(timelineSql,/timeline members can read/i);
+  assert.match(timelineSql,/timeline editors can insert/i);
+  assert.match(timelineSql,/alter publication supabase_realtime add table public\.trip_timeline_items/i);
+  assert.match(resetSql,/drop table if exists public\.trip_timeline_items cascade/i);
 });

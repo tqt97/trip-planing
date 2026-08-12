@@ -20,7 +20,7 @@ for (let i=0;i<places.length;i++) {
   await request('/rest/v1/places?on_conflict=trip_id,seed_key', { method:'POST', headers, body:JSON.stringify({ trip_id:tripId,name:String(p.name||'').trim(),address:String(p.address||''),category:p.category||'other',priority:p.priority||'want',note:String(p.note||''),note_url:String(p.noteUrl||''),image_url:String(p.imageUrl||''),lat:Number.isFinite(Number(p.lat))?Number(p.lat):null,lng:Number.isFinite(Number(p.lng))?Number(p.lng):null,route_source:'fallback',source:'seed',seed_key:seedKey }) });
 }
 const checklists=Array.isArray(seed.checklists)?seed.checklists:[];
-for(let i=0;i<checklists.length;i++){const c=checklists[i];await request('/rest/v1/checklists?on_conflict=id',{method:'POST',headers,body:JSON.stringify({id:c.id||crypto.randomUUID(),trip_id:tripId,title:String(c.title||'').trim(),category:c.category||'prepare',visibility:c.visibility||'public',done:Boolean(c.done),note:String(c.note||'')})});}
+for(let i=0;i<checklists.length;i++){const c=checklists[i];await request('/rest/v1/checklists?on_conflict=id',{method:'POST',headers,body:JSON.stringify({id:c.id||crypto.randomUUID(),trip_id:tripId,title:String(c.title||'').trim(),category:c.category||'prepare',visibility:c.visibility||'public',note:String(c.note||'')})});}
 console.log(`seed: ${trip.name} (${trip.slug}) · ${places.length} địa điểm · ${checklists.length} checklist`);
 
 async function request(pathname, options){const res=await fetch(`${url}${pathname}`,options);const text=await res.text();const payload=text?JSON.parse(text):null;if(!res.ok)throw new Error(`Seed HTTP ${res.status}: ${text}`);return payload}

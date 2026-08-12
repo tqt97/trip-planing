@@ -1,0 +1,9 @@
+{
+  "name": "Ní ơi, mình đi đâu thế",
+  "short_name": "Ní ơi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f3f6f2",
+  "theme_color": "#173f35",
+  "icons": [{"src":"/favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

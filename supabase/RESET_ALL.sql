@@ -12,7 +12,9 @@ delete from storage.objects where bucket_id in ('place-images','trip-album');
 delete from storage.buckets where id in ('place-images','trip-album');
 
 drop table if exists public.trip_album_items cascade;
+drop table if exists public.checklist_completions cascade;
 drop table if exists public.checklists cascade;
+drop table if exists public.trip_timeline_items cascade;
 drop table if exists public.place_votes cascade;
 drop table if exists public.expenses cascade;
 drop table if exists public.places cascade;

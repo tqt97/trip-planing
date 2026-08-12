@@ -140,6 +140,24 @@ export class SupabaseHttpClient {
     return `${this.url}/storage/v1/object/public/${encodeURIComponent(bucket)}/${cleanPath.split('/').map(encodeURIComponent).join('/')}`;
   }
 
+
+  async deletePublicFile(bucket, publicUrl) {
+    const prefix = `${this.url}/storage/v1/object/public/${encodeURIComponent(bucket)}/`;
+    const value = String(publicUrl || '');
+    if (!value.startsWith(prefix)) return false;
+    const encodedPath = value.slice(prefix.length);
+    const cleanPath = encodedPath.split('/').map((segment) => decodeURIComponent(segment)).join('/');
+    if (!cleanPath) return false;
+    const res = await fetch(`${this.url}/storage/v1/object/${encodeURIComponent(bucket)}/${cleanPath.split('/').map(encodeURIComponent).join('/')}`, {
+      method: 'DELETE', headers: this.headers()
+    });
+    if (!res.ok && res.status !== 404) {
+      const text = await res.text(); const payload = text ? safeJson(text) : null;
+      throw new Error(payload?.message || payload?.error || `Storage HTTP ${res.status}`);
+    }
+    return true;
+  }
+
   subscribeTables(tables, onChange) {
     this.disconnectRealtime();
     if (!this.accessToken || !this.configured || typeof WebSocket === 'undefined') return () => {};

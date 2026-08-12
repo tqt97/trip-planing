@@ -1,6 +1,6 @@
 import { exportState, importState, sanitizeHome } from '../core.js';
 
-export const STORAGE_KEY = 'dalat-nearby-planner:v5';
+export const STORAGE_KEY = 'dalat-nearby-planner:v7';
 export const TRACE_KEY = 'dalat-nearby-planner:traces:v1';
 export const UI_PREFS_KEY = 'dalat-nearby-planner:ui:v1';
 export const MAX_TRACES = 80;
@@ -14,19 +14,27 @@ export function normalizePageSize(value) {
 export function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
+      || localStorage.getItem('dalat-nearby-planner:v6')
+      || localStorage.getItem('dalat-nearby-planner:v5')
       || localStorage.getItem('dalat-nearby-planner:v4')
       || localStorage.getItem('dalat-nearby-planner:v3')
       || localStorage.getItem('dalat-nearby-planner:v2')
       || localStorage.getItem('dalat-nearby-planner:v1');
-    if (!raw) return { home: sanitizeHome({}), tripSettings: { peopleCount: 4 }, places: [], expenses: [], checklists: [], album: [] };
+    if (!raw) return { home: sanitizeHome({}), tripSettings: { peopleCount: 4 }, places: [], expenses: [], checklists: [], checklistCompletions: [], album: [], timeline: [] };
     return importState(raw);
   } catch {
-    return { home: sanitizeHome({}), tripSettings: { peopleCount: 4 }, places: [], expenses: [], checklists: [], album: [] };
+    return { home: sanitizeHome({}), tripSettings: { peopleCount: 4 }, places: [], expenses: [], checklists: [], checklistCompletions: [], album: [], timeline: [] };
   }
 }
 
 export function persistState(state) {
   localStorage.setItem(STORAGE_KEY, exportState(state));
+}
+
+export function clearPersistedState() {
+  ['dalat-nearby-planner:v7','dalat-nearby-planner:v6','dalat-nearby-planner:v5','dalat-nearby-planner:v4','dalat-nearby-planner:v3','dalat-nearby-planner:v2','dalat-nearby-planner:v1'].forEach((key) => {
+    try { localStorage.removeItem(key); } catch {}
+  });
 }
 
 export function loadUiPrefs(defaults = {}) {
