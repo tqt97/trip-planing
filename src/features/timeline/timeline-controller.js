@@ -31,9 +31,8 @@ export function createTimelineController({ els, state, getRepository, persistSta
       button.dataset.timelineNav = 'date';
       button.dataset.timelineDate = date;
       button.setAttribute('aria-pressed', String(date === activeDate));
-      const short = document.createElement('span'); short.textContent = formatDayShort(date);
-      const full = document.createElement('small'); full.textContent = formatDate(date);
-      button.append(short, full); tabs.append(button);
+      button.textContent = formatDate(date);
+      tabs.append(button);
     }
     nav.append(tabs, navButton('→', 'Ngày sau', 'next', activeIndex >= dates.length - 1));
     return nav;
@@ -97,11 +96,10 @@ export function createTimelineController({ els, state, getRepository, persistSta
   return {render,open,save,action};
 }
 
-function navButton(text,label,action,disabled){const b=document.createElement('button');b.type='button';b.className='timeline-nav-btn';b.dataset.timelineNav=action;b.setAttribute('aria-label',label);b.disabled=disabled;b.textContent=text;return b}
+function navButton(text,label,action,disabled){const b=document.createElement('button');b.type='button';b.className='timeline-nav-btn';b.dataset.timelineNav=action;b.setAttribute('aria-label',label);b.title=label;b.disabled=disabled;b.textContent=text;return b}
 function periodLabel(time='00:00'){const h=Number(time.slice(0,2));if(h<11)return'Sáng';if(h<13)return'Trưa';if(h<18)return'Chiều';return'Tối'}
 function actionButton(text,label,action,extra=''){const b=document.createElement('button');b.type='button';b.className=`icon-btn ${extra}`.trim();b.dataset.timelineAction=action;b.setAttribute('aria-label',label);b.textContent=text;return b}
 function parseLocalDate(date){return new Date(`${date}T00:00:00`)}
 function formatDate(date){try{return new Intl.DateTimeFormat('vi-VN',{weekday:'short',day:'2-digit',month:'2-digit'}).format(parseLocalDate(date))}catch{return date}}
 function formatDateLong(date){try{return new Intl.DateTimeFormat('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}).format(parseLocalDate(date))}catch{return date}}
 function formatWeekday(date){try{return new Intl.DateTimeFormat('vi-VN',{weekday:'long'}).format(parseLocalDate(date))}catch{return ''}}
-function formatDayShort(date){try{return new Intl.DateTimeFormat('vi-VN',{day:'2-digit',month:'2-digit'}).format(parseLocalDate(date))}catch{return date}}

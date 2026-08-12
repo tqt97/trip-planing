@@ -1,4 +1,4 @@
-# Đà Lạt Nearby Planner v2.9.6
+# Đà Lạt Nearby Planner v2.9.7
 
 Mobile-first collaborative trip planner.
 
@@ -71,7 +71,7 @@ Hiện tại: 47/47 tests + UI/performance/build/smoke + 2,000 monkey mutations 
 - Quality: `docs/QUALITY_REPORT.md`
 
 
-## v2.9.6 — Timeline, chốt tiền, PWA
+## v2.9.7 — Timeline, chốt tiền, PWA
 
 - Timeline theo ngày + giờ, tự sắp xếp từ sáng → trưa → chiều → tối.
 - Chi tiêu hỗ trợ `participants` cho từng khoản và mục **Chốt tiền / Ai nợ ai**.

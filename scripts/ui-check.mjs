@@ -75,6 +75,12 @@ assert(/\.album-toolbar\{[^}]*margin:14px 20px 10px[^}]*padding:10px 13px[^}]*di
 assert(!css.includes('.album-head-actions') && !css.includes('grid-auto-columns:min(82vw,286px)'), 'stale carousel-era image CSS must stay removed');
 assert(/@media \(max-width:520px\)\{[^}]*\.album-toolbar\{[^}]*gap:6px/s.test(css), 'Image toolbar must stay compact on phones');
 
+
+assert(/\.places-list\{[^}]*padding:10px 20px 18px/s.test(css) && /@media\s*\(max-width:\s*820px\)[\s\S]*?\.places-list\s*\{[^}]*padding:\s*8px 14px 12px/s.test(css), 'Places filter/list spacing must remain even on desktop and mobile');
+assert(/\.page-numbers\{[^}]*display:flex[^}]*gap:6px/s.test(css) && /@media\s*\(max-width:\s*820px\)[\s\S]*?\.page-numbers\s*\{[^}]*gap:\s*5px/s.test(css), 'Page number buttons must keep visible spacing');
+const timelineControllerSource = fs.readFileSync('src/features/timeline/timeline-controller.js','utf8');
+assert(!timelineControllerSource.includes("document.createElement('small')") && !timelineControllerSource.includes("const short = document.createElement('span')"), 'Timeline day selector must stay single-line without redundant nested date labels');
+assert(/\.timeline-navigator\{[^}]*margin:10px 0 12px/s.test(css), 'Timeline date navigator needs balanced vertical spacing');
 assert(html.includes('id="timelineSection"') && html.includes('id="timelineDialog"'), 'Timeline UI missing');
 assert(/\.timeline-board\{[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/.test(css), 'desktop Timeline must compare three day columns');
 assert(css.includes('.timeline-events:before') && css.includes('.timeline-marker'), 'Timeline must render a visible time rail and event markers');

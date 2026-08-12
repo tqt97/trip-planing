@@ -162,7 +162,7 @@
     max-height: 520px;
     overflow: auto;
     overscroll-behavior: contain;
-    padding: 0 14px 12px;
+    padding: 8px 14px 12px;
     scrollbar-width: thin;
   }
   .place-row {
@@ -171,8 +171,8 @@
     padding: 9px 10px;
   }
   .place-main h3 { margin-bottom: 2px; font-size: 13.5px; }
-  .place-main p { font-size: 10.75px; line-height: 1.25; }
-  .place-note { margin-top: 4px; font-size: 10.75px; }
+  .place-main p { font-size: 11px; line-height: 1.25; }
+  .place-note { margin-top: 4px; font-size: 11px; }
   .place-note-link { margin-top: 4px; font-size: 10.5px; }
   .row-actions {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -183,7 +183,8 @@
     min-height: 30px;
     font-size: 14px;
   }
-  .pagination { padding: 0 14px 14px; }
+  .pagination { padding: 0 14px 14px; gap: 6px; }
+  .page-numbers { gap: 5px; }
   .page-summary {
     flex-basis: 100%;
     text-align: center;
@@ -368,7 +369,7 @@
     right: 5px;
     left: 5px;
   }
-  .mobile-nav span { font-size: 8.25px; }
+  .mobile-nav span { font-size: 8.5px; }
   .mobile-nav button { padding-inline: 1px; }
   .member-row {
     grid-template-columns: minmax(0, 1fr) 82px;
@@ -441,13 +442,13 @@
     box-sizing: border-box;
     overflow: hidden;
     border-radius: 9px;
-    font-size: 9.25px;
+    font-size: 9.5px;
     line-height: 1;
     text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .route-meta > .distance { font-size: 9.75px; }
+  .route-meta > .distance { font-size: 10px; }
 }
 
 @media (max-width: 360px) {

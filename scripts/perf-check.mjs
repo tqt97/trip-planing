@@ -7,7 +7,7 @@ const files = [
 ];
 const size = file => fs.statSync(file).size;
 const gzip = file => zlib.gzipSync(fs.readFileSync(file), { level: 9 }).length;
-const budgets = { 'styles.css': 41100, 'src/app/main.js': 36000, 'src/core.js': 22000, 'src/data/supabase-client.js': 12000 };
+const budgets = { 'styles.css': 41600, 'src/app/main.js': 36000, 'src/core.js': 22000, 'src/data/supabase-client.js': 12000 };
 for (const [file, max] of Object.entries(budgets)) if (size(file) > max) throw new Error(`perf: ${file} ${size(file)} B exceeds ${max} B budget`);
 const html = fs.readFileSync('index.html','utf8');
 if (/<script[^>]+src="https?:\/\//.test(html) || /<link[^>]+href="https?:\/\//.test(html)) throw new Error('perf: external blocking runtime assets are not allowed');

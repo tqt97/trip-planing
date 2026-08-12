@@ -22,7 +22,7 @@ test('Supabase storage client can safely delete only its own public bucket URLs'
 
 test('service worker refreshes deploy assets online and only falls back to cache offline', () => {
   const sw = fs.readFileSync('sw.js','utf8');
-  assert.match(sw, /CACHE='dalat-planner-v2\.9\.6'/);
+  assert.match(sw, /CACHE='dalat-planner-v2\.9\.7'/);
   assert.match(sw, /event\.respondWith\(fetch\(req\)\.then/);
   assert.match(sw, /client=>client\.navigate\(client\.url\)/);
   assert.doesNotMatch(sw, /caches\.match\(req\)\.then\(cached=>cached\|\|fetch/);
