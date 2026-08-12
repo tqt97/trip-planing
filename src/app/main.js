@@ -20,6 +20,7 @@ import { bindScrollControl } from '/src/app/bindings.js';
 import { createTimelineController } from '/src/features/timeline/timeline-controller.js';
 import { parseParticipants } from '/src/features/expenses/settlement.js';
 import { initPwa } from '/src/app/pwa.js';
+import { userErrorMessage } from '/src/app/error-message.js';
 
 const APP_STARTED_AT = performance.now();
 const state = loadState();
@@ -47,8 +48,8 @@ const { applyFallbackDistance, calculateDistance, refreshAllDistances } = create
 const appShell = createAppShell({ bootGate: $('#bootGate'), bootMessage: $('#bootMessage'), authGate: $('#authGate'), authMessage: $('#authMessage'), loginButton: $('#googleLoginBtn') });
 const persistAppState = () => { if(dataConfig.provider === 'localStorage') persistState(state); };
 const checklistController = createChecklistController({ els, state, getRepository: () => repository, getCurrentUser: () => currentUser, getMembers: () => members, persistState: persistAppState, toast, trace, errorDetails });
-const albumController = createAlbumController({ els, state, getRepository: () => repository, getCurrentUser: () => currentUser, persistState: persistAppState, toast, trace, errorDetails });
-const expensePager = createExpensePager({ els, state, pageSize: 8 });
+const albumController = createAlbumController({ els, state, getRepository: () => repository, getCurrentUser: () => currentUser, persistState: persistAppState, toast, trace, errorDetails, scrollTarget: $('#albumSection') });
+const expensePager = createExpensePager({ els, state, pageSize: 8, scrollTarget: $('#expenseSection'), getRepository:()=>repository, canEditShared, persistState:persistAppState, toast, trace, errorDetails });
 const timelineController = createTimelineController({ els, state, getRepository: () => repository, persistState: persistAppState, toast, trace, errorDetails });
 initPwa({ trace });
 
@@ -76,7 +77,7 @@ async function init() {
   trace('info', 'APP_READY', `Ứng dụng sẵn sàng sau ${Math.round(performance.now() - APP_STARTED_AT)}ms.`, { bootMs: Math.round(performance.now() - APP_STARTED_AT), collaborative: Boolean(repository) });
 }
 function bind() {
-  $('#googleLoginBtn')?.addEventListener('click', () => { if(!collaborationClient) return; appShell.setLoginBusy(true); try { collaborationClient.signInWithGoogle(`${location.origin}/`); } catch (error) { appShell.setLoginBusy(false); trace('error','SUPABASE_LOGIN_FAILED',error.message,errorDetails(error)); } });
+  $('#googleLoginBtn')?.addEventListener('click', () => { if(!collaborationClient) return; appShell.setLoginBusy(true); try { collaborationClient.signInWithGoogle(`${location.origin}/`); } catch (error) { appShell.setLoginBusy(false); trace('error','SUPABASE_LOGIN_FAILED',error.message,errorDetails(error)); toast(userErrorMessage(error,'Không thể bắt đầu đăng nhập Google. Vui lòng thử lại.')); } });
   $('#userBtn')?.addEventListener('click', signOutUser);
   $('#membersBtn')?.addEventListener('click', openMembersDialog);
   $('#mobileMembersBtn')?.addEventListener('click', openMembersDialog);
@@ -113,7 +114,7 @@ function bind() {
   els.albumNextPageBtn?.addEventListener('click', () => albumController.changePage(Number(els.albumPageNumbers?.querySelector('[aria-current="page"]')?.dataset.page || 1) + 1)); els.albumPageNumbers?.addEventListener('click', (event) => { const btn = event.target.closest('[data-page]'); if(btn) albumController.changePage(Number(btn.dataset.page)); });
   expensePager.bind();
   document.querySelectorAll('.close-album').forEach((b)=>b.addEventListener('click',()=>els.albumDialog.close())); document.querySelectorAll('.close-album-lightbox').forEach((b)=>b.addEventListener('click',()=>els.albumLightbox.close()));
-  els.peopleCount?.addEventListener('change', onPeopleCountChange); els.placeImage?.addEventListener('change', () => previewPlaceImage(els));
+  els.placeImage?.addEventListener('change', () => previewPlaceImage(els));
   document.querySelectorAll('.close-expense').forEach((b) => b.addEventListener('click', () => els.expenseDialog.close()));
   document.querySelectorAll('.section-collapse-hit').forEach((header) => { header.addEventListener('click', toggleSectionFromHeader); header.addEventListener('keydown', toggleSectionFromHeader); });
   els.expenseForm.addEventListener('submit', saveExpense);
@@ -192,7 +193,7 @@ async function initCollaboration() {
     return true;
   } catch (error) {
     appShell.setLoginBusy(false);
-    appShell.auth(`Không kết nối được dữ liệu dùng chung: ${error.message}`);
+    appShell.auth(userErrorMessage(error, 'Không kết nối được dữ liệu dùng chung. Vui lòng thử lại.'));
     trace('error','COLLAB_CONNECT_FAILED',error.message,errorDetails(error));
     return false;
   }
@@ -225,7 +226,7 @@ function updateLocalModeUi(){if($('#userBtn'))$('#userBtn').hidden=true;if($('#m
 async function signOutUser(){if(!collaborationClient)return;if(!confirm('Đăng xuất khỏi Trip?'))return;await collaborationClient.signOut();location.reload()}
 function openMembersDialog(){renderMembers();$('#membersDialog')?.showModal()}
 function renderMembers(){const list=$('#membersList');if(!list)return;$('#memberRoleInfo').textContent=`Bạn đang là ${repository?.role||'—'} · ${members.length} thành viên.`;renderMemberList(list,members,{currentUserId:currentUser?.id,role:repository?.role})}
-async function onMemberRoleChange(event){const select=event.target.closest('[data-member-id]');if(!select||!repository)return;try{await repository.updateMemberRole(select.dataset.memberId,select.value);toast('Đã cập nhật quyền thành viên.');await reloadCollaborativeData('member-role')}catch(error){toast(`Không đổi được quyền: ${error.message}`);await reloadCollaborativeData('member-role-failed')}}
+async function onMemberRoleChange(event){const select=event.target.closest('[data-member-id]');if(!select||!repository)return;try{await repository.updateMemberRole(select.dataset.memberId,select.value);toast('Đã cập nhật quyền thành viên.');await reloadCollaborativeData('member-role')}catch(error){trace('error','MEMBER_ROLE_UPDATE_FAILED',error.message,errorDetails(error));toast(userErrorMessage(error,'Không đổi được quyền thành viên. Vui lòng thử lại.'));await reloadCollaborativeData('member-role-failed')}}
 function canEditShared(){return !repository || repository.canEdit()}
 
 function seedPlacesIfEmpty() {
@@ -264,7 +265,7 @@ function render() {
   els.placesList.replaceChildren(...page.items.map(place => createPlaceRow(place, { currentUserId: currentUser?.id, votes })));
   els.emptyState.hidden = filtered.length > 0;
   renderPagination(els, page);
-  try { renderRadar(); } catch (error) { trace('error', 'RADAR_RENDER_FAILED', 'Không thể render radar vị trí.', errorDetails(error)); if (els.radarSummary) els.radarSummary.textContent = 'Radar tạm thời không hiển thị · mở Nhật ký để xem Trace.'; }
+  try { renderRadar(); } catch (error) { trace('error', 'RADAR_RENDER_FAILED', 'Không thể render radar vị trí.', errorDetails(error)); if (els.radarSummary) els.radarSummary.textContent = 'Radar tạm thời không hiển thị.'; }
   renderRecommendations(els.recommendations, state.places, votes, openGoogleMaps); renderClusters(els.clusters, state.places, openGoogleMaps); expensePager.render(); timelineController.render(); checklistController.render(); albumController.render();
 }
 
@@ -283,8 +284,8 @@ function openExpenseDialog(expense=null){els.expenseForm.reset();els.expenseMess
 async function saveExpense(event){
   event.preventDefault();els.expenseMessage.textContent='';
   const input=sanitizeExpense({id:els.expenseId.value||(repository&&crypto.randomUUID?crypto.randomUUID():undefined),payer:els.expensePayer.value,category:els.expenseCategory.value,amountVnd:els.expenseAmount.value,participants:parseParticipants(els.expenseParticipants.value),note:els.expenseNote.value,createdAt:state.expenses?.find(x=>x.id===els.expenseId.value)?.createdAt});
-  if(!canEditShared()){const id=trace('warn','ROLE_VIEWER','Viewer không thể sửa chi tiêu.');els.expenseMessage.textContent=`Bạn đang ở quyền viewer · Trace ${id}`;return}
-  const errors=validateExpense(input);if(errors.length){const id=trace('error','EXPENSE_VALIDATION',errors[0]);els.expenseMessage.textContent=`${errors[0]} · Trace ${id}`;return}
+  if(!canEditShared()){trace('warn','ROLE_VIEWER','Viewer không thể sửa chi tiêu.');els.expenseMessage.textContent='Bạn đang ở quyền viewer nên không thể sửa chi tiêu.';return}
+  const errors=validateExpense(input);if(errors.length){trace('error','EXPENSE_VALIDATION',errors[0]);els.expenseMessage.textContent=errors[0];return}
   setBusy(els.saveExpenseBtn,true,'Đang lưu…');
   try {
     state.expenses ||= [];
@@ -292,8 +293,8 @@ async function saveExpense(event){
     const idx=state.expenses.findIndex(x=>x.id===saved.id);if(idx>=0)state.expenses[idx]=saved;else state.expenses.push(saved);
     persistAppState();expensePager.reset();els.expenseDialog.close();trace('info',idx>=0?'EXPENSE_UPDATED':'EXPENSE_ADDED',`${input.payer} · ${formatMoney(input.amountVnd)}`);toast(idx>=0?'Đã cập nhật khoản chi.':'Đã lưu khoản chi.');
   } catch (error) {
-    const id=trace('error','EXPENSE_SAVE_FAILED',error.message,errorDetails(error));
-    els.expenseMessage.textContent=`Không lưu được khoản chi: ${error.message} · Trace ${id}`;
+    trace('error','EXPENSE_SAVE_FAILED',error.message,errorDetails(error));
+    els.expenseMessage.textContent=userErrorMessage(error,'Không lưu được khoản chi. Vui lòng thử lại.');
   } finally {
     setBusy(els.saveExpenseBtn,false,'Lưu khoản chi');
   }
@@ -327,21 +328,21 @@ async function savePlace(event){
     persistAppState(); render(); els.placeDialog.close(); toast(usedFallback?'Đã lưu · đang dùng ETA Đà Lạt ước tính.':'Đã lưu · khoảng cách từ ORS, ETA đã hiệu chỉnh cho Đà Lạt.');
   } catch (error) {
     if(repository&&uploadedImageUrl)await repository.deletePlaceImage(uploadedImageUrl).catch(()=>{});
-    const id=trace('error','PLACE_SAVE_FAILED',error.message,errorDetails(error));
-    els.placeMessage.textContent=`Không lưu được địa điểm: ${error.message} · Trace ${id}`;
+    trace('error','PLACE_SAVE_FAILED',error.message,errorDetails(error));
+    els.placeMessage.textContent=userErrorMessage(error,'Không lưu được địa điểm. Vui lòng thử lại.');
   } finally {
     setBusy(els.savePlaceBtn,false,'Lưu địa điểm');
   }
 }
 
-function showFormError(message, code){const traceId=trace('error',code,message);els.placeMessage.textContent=`${message} · Trace ${traceId}`}
+function showFormError(message, code){trace('error',code,message);els.placeMessage.textContent=message}
 
 async function onPlaceAction(event){const btn=event.target.closest('[data-action]');if(!btn)return;const row=btn.closest('[data-id]');const place=state.places.find(p=>p.id===row?.dataset.id);if(!place)return;
-  if(btn.dataset.action==='vote'){if(!repository||!currentUser)return;const voted=hasUserVoted(place.id,currentUser.id,votes);try{await repository.setVote(place.id,!voted);await reloadCollaborativeData('vote');toast(voted?'Đã bỏ vote.':'Đã vote địa điểm ♥');}catch(error){toast(`Vote lỗi: ${error.message}`)}return}
+  if(btn.dataset.action==='vote'){if(!repository||!currentUser)return;const voted=hasUserVoted(place.id,currentUser.id,votes);try{await repository.setVote(place.id,!voted);await reloadCollaborativeData('vote');toast(voted?'Đã bỏ vote.':'Đã vote địa điểm ♥');}catch(error){trace('error','PLACE_VOTE_FAILED',error.message,errorDetails(error));toast(userErrorMessage(error,'Không cập nhật được vote. Vui lòng thử lại.'))}return}
   if(btn.dataset.action==='edit'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');openPlaceDialog(place)}
   if(btn.dataset.action==='delete'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');if(confirm(`Xóa “${place.name}”?`)){if(repository){await repository.deletePlace(place.id);if(place.imageUrl)repository.deletePlaceImage(place.imageUrl).catch(error=>trace('warn','PLACE_IMAGE_CLEANUP_FAILED',error.message,errorDetails(error)))}state.places=state.places.filter(p=>p.id!==place.id);persistAppState();render();toast('Đã xóa địa điểm.')}}
   if(btn.dataset.action==='map'){openGoogleMaps(place.lat,place.lng,place.name)}
-  if(btn.dataset.action==='refresh'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');setBusy(btn,true,'…');try{await calculateDistance(place);if(repository)await repository.savePlace(place);persistAppState();render();toast('Đã cập nhật route và ETA.')}catch(error){applyFallbackDistance(place);if(repository)await repository.savePlace(place).catch(()=>{});persistAppState();render();const id=trace('warn','PLACE_REFRESH_FALLBACK',`Không lấy được ORS cho ${place.name}; dùng fallback.`,errorDetails(error));toast(`ORS lỗi · dùng ETA fallback · Trace ${id}`)}finally{setBusy(btn,false,'↻')}}}
+  if(btn.dataset.action==='refresh'){if(!canEditShared())return toast('Bạn đang ở quyền viewer.');setBusy(btn,true,'…');try{await calculateDistance(place);if(repository)await repository.savePlace(place);persistAppState();render();toast('Đã cập nhật route và ETA.')}catch(error){applyFallbackDistance(place);if(repository)await repository.savePlace(place).catch(()=>{});persistAppState();render();trace('warn','PLACE_REFRESH_FALLBACK',`Không lấy được ORS cho ${place.name}; dùng fallback.`,errorDetails(error));toast('Không lấy được tuyến đường · đang dùng ETA ước tính.')}finally{setBusy(btn,false,'↻')}}}
 
 function onRadarAction(event){const target=event.target.closest('[data-radar-map]');if(!target)return;openGoogleMaps(Number(target.dataset.lat),Number(target.dataset.lng),target.getAttribute('aria-label')||'Radar place')}
 function onRadarKeydown(event){if(event.key!=='Enter'&&event.key!==' ')return;const target=event.target.closest('[data-radar-map]');if(!target)return;event.preventDefault();openGoogleMaps(Number(target.dataset.lat),Number(target.dataset.lng),target.getAttribute('aria-label')||'Radar place')}
@@ -357,21 +358,11 @@ function toggleSectionFromHeader(event){
   const collapsed=section.classList.toggle('section-collapsed');
   header.setAttribute('aria-expanded',String(!collapsed));
 }
-function openGoogleMaps(lat,lng,label='Địa điểm'){const url=googleMapsCoordinateUrl(lat,lng);if(!url){const id=trace('warn','MAP_COORDS_INVALID',`Không thể mở Google Maps cho ${label}.`,{lat,lng});toast(`Tọa độ không hợp lệ · Trace ${id}`);return}window.open(url,'_blank','noopener,noreferrer')}
+function openGoogleMaps(lat,lng,label='Địa điểm'){const url=googleMapsCoordinateUrl(lat,lng);if(!url){trace('warn','MAP_COORDS_INVALID',`Không thể mở Google Maps cho ${label}.`,{lat,lng});toast('Tọa độ không hợp lệ.');return}window.open(url,'_blank','noopener,noreferrer')}
 
 function downloadState(){const blob=new Blob([exportState(state)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`dalat-nearby-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url)}
-async function importFile(event){const file=event.target.files?.[0];if(!file)return;try{const next=importState(await file.text());if(repository){if(!canEditShared())throw new Error('Viewer không thể import dữ liệu vào Trip.');for(const raw of next.places){const p=sanitizePlace({...raw,id:crypto.randomUUID(),source:'imported'});if(validCoords(state.home)&&validCoords(p))applyFallbackDistance(p);await repository.savePlace(p)}for(const raw of next.expenses||[]){const e=sanitizeExpense({...raw,id:crypto.randomUUID()});await repository.saveExpense(e)}for(const raw of next.checklists||[]){const c=sanitizeChecklist({...raw,id:crypto.randomUUID(),createdBy:''});await repository.saveChecklist(c)}for(const raw of next.album||[]){const a={...raw,id:crypto.randomUUID(),imageUrl:String(raw.imageUrl||'').startsWith('http')?raw.imageUrl:''};await repository.saveAlbumItem(a)}for(const raw of next.timeline||[]){await repository.saveTimelineItem({...raw,id:crypto.randomUUID(),placeId:''})}if(next.tripSettings?.peopleCount)await repository.updatePeopleCount(next.tripSettings.peopleCount);await reloadCollaborativeData('import');toast(`Đã merge ${next.places.length} địa điểm · ${(next.expenses||[]).length} khoản chi vào Trip.`);}else{state.places=next.places;state.expenses=next.expenses||[];state.checklists=next.checklists||[];state.checklistCompletions=next.checklistCompletions||[];state.album=next.album||[];state.timeline=next.timeline||[];state.tripSettings=next.tripSettings||sanitizeTripSettings({peopleCount:4});state.places.forEach(applyFallbackDistance);persistAppState();render();toast(`Đã nhập ${state.places.length} địa điểm · ${state.expenses.length} khoản chi.`)}trace('info','IMPORT_OK',`Đã nhập ${next.places.length} địa điểm.`)}catch(error){const id=trace('error','IMPORT_FAILED','Không thể nhập file JSON.',errorDetails(error));toast(`${error.message||'File JSON không hợp lệ'} · Trace ${id}`)}finally{event.target.value=''}}
+async function importFile(event){const file=event.target.files?.[0];if(!file)return;try{const next=importState(await file.text());if(repository){if(!canEditShared())throw new Error('Viewer không thể import dữ liệu vào Trip.');for(const raw of next.places){const p=sanitizePlace({...raw,id:crypto.randomUUID(),source:'imported'});if(validCoords(state.home)&&validCoords(p))applyFallbackDistance(p);await repository.savePlace(p)}for(const raw of next.expenses||[]){const e=sanitizeExpense({...raw,id:crypto.randomUUID()});await repository.saveExpense(e)}for(const raw of next.checklists||[]){const c=sanitizeChecklist({...raw,id:crypto.randomUUID(),createdBy:''});await repository.saveChecklist(c)}for(const raw of next.album||[]){const a={...raw,id:crypto.randomUUID(),imageUrl:String(raw.imageUrl||'').startsWith('http')?raw.imageUrl:''};await repository.saveAlbumItem(a)}for(const raw of next.timeline||[]){await repository.saveTimelineItem({...raw,id:crypto.randomUUID(),placeId:''})}if(next.tripSettings?.peopleCount)await repository.updatePeopleCount(next.tripSettings.peopleCount);await reloadCollaborativeData('import');toast(`Đã merge ${next.places.length} địa điểm · ${(next.expenses||[]).length} khoản chi vào Trip.`);}else{state.places=next.places;state.expenses=next.expenses||[];state.checklists=next.checklists||[];state.checklistCompletions=next.checklistCompletions||[];state.album=next.album||[];state.timeline=next.timeline||[];state.tripSettings=next.tripSettings||sanitizeTripSettings({peopleCount:4});state.places.forEach(applyFallbackDistance);persistAppState();render();toast(`Đã nhập ${state.places.length} địa điểm · ${state.expenses.length} khoản chi.`)}trace('info','IMPORT_OK',`Đã nhập ${next.places.length} địa điểm.`)}catch(error){trace('error','IMPORT_FAILED','Không thể nhập file JSON.',errorDetails(error));toast(userErrorMessage(error,'File JSON không hợp lệ hoặc không thể nhập.'))}finally{event.target.value=''}}
 
 
-
-async function onPeopleCountChange(){
-  const next=sanitizeTripSettings({peopleCount:els.peopleCount.value});
-  const previous=state.tripSettings.peopleCount;
-  state.tripSettings=next; expensePager.render(); persistAppState();
-  if(repository){
-    if(!canEditShared()){state.tripSettings.peopleCount=previous;expensePager.render();toast('Viewer không thể đổi số người.');return}
-    try{await repository.updatePeopleCount(next.peopleCount);toast(`Đã đặt ${next.peopleCount} người để chia chi phí.`)}catch(error){state.tripSettings.peopleCount=previous;expensePager.render();toast(`Không lưu được số người: ${error.message}`)}
-  }
-}
 
 function openTraceDialog(){diagnostics.open(`Home: ${validCoords(state.home)?'OK':'CHƯA CẤU HÌNH'} · Routing: ${routingConfigured?'ORS ENABLED':'FALLBACK READY'}`)}

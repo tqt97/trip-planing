@@ -1,3 +1,4 @@
+import { userErrorMessage } from '../../app/error-message.js';
 import { sanitizeChecklist, validateChecklist } from '../../core.js';
 import { setBusy } from '../../app/ui.js';
 import { renderChecklists } from './checklist-view.js';
@@ -29,7 +30,7 @@ export function createChecklistController({ els, state, getRepository, getCurren
       const idx = state.checklists.findIndex(x => x.id === saved.id); if (idx >= 0) state.checklists[idx] = saved; else state.checklists.push(saved);
       persistState(state); render(); els.checklistDialog.close(); toast('Đã lưu checklist.');
     } catch (error) {
-      const id = trace('error', 'CHECKLIST_SAVE_FAILED', error.message, errorDetails(error)); els.checklistMessage.textContent = `Không lưu được checklist: ${error.message} · Trace ${id}`;
+      trace('error', 'CHECKLIST_SAVE_FAILED', error.message, errorDetails(error)); els.checklistMessage.textContent = userErrorMessage(error, 'Không lưu được công việc. Vui lòng thử lại.');
     } finally { setBusy(els.saveChecklistBtn, false, 'Lưu checklist'); }
   }
   async function action(event) {
@@ -46,7 +47,7 @@ export function createChecklistController({ els, state, getRepository, getCurren
         else if (alreadyDone) state.checklistCompletions = (state.checklistCompletions || []).filter(x => !(x.checklistId === item.id && x.userId === userId));
         else state.checklistCompletions = [...(state.checklistCompletions || []), { checklistId: item.id, userId, completedAt: new Date().toISOString() }];
         persistState(state); render();
-      } catch (error) { toast(`Không cập nhật checklist: ${error.message}`); }
+      } catch (error) { trace('error','CHECKLIST_TOGGLE_FAILED',error.message,errorDetails(error)); toast(userErrorMessage(error,'Không cập nhật được công việc. Vui lòng thử lại.')); }
       return;
     }
     if (btn.dataset.checkAction === 'delete' && confirm(`Xóa “${item.title}”?`)) {
@@ -55,7 +56,7 @@ export function createChecklistController({ els, state, getRepository, getCurren
         state.checklists = state.checklists.filter(x => x.id !== item.id);
         state.checklistCompletions = (state.checklistCompletions || []).filter(x => x.checklistId !== item.id);
         persistState(state); render();
-      } catch (error) { toast(`Không xóa được checklist: ${error.message}`); }
+      } catch (error) { trace('error','CHECKLIST_DELETE_FAILED',error.message,errorDetails(error)); toast(userErrorMessage(error,'Không xóa được công việc. Vui lòng thử lại.')); }
     }
   }
   return { render, open, save, action, canEdit };

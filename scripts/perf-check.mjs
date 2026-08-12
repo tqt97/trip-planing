@@ -3,7 +3,7 @@ import zlib from 'node:zlib';
 
 const files = [
   'index.html','styles.css','app.js','src/app/main.js','src/core.js','src/data/supabase-client.js','src/data/repository.js',
-  'src/app/ui.js','src/app/radar-view.js','src/app/pwa.js','src/features/timeline/timeline-controller.js','src/features/timeline/timeline-view.js','src/features/expenses/settlement.js','manifest.webmanifest','sw.js','src/features/places/place-view.js','src/features/recommendations/recommendation-view.js','src/features/expenses/expense-view.js','src/features/checklists/checklist-view.js','src/features/checklists/checklist-controller.js','src/features/places/place-media.js'
+  'src/app/ui.js','src/app/error-message.js','src/app/radar-view.js','src/app/pwa.js','src/features/timeline/timeline-controller.js','src/features/timeline/timeline-view.js','src/features/expenses/settlement.js','manifest.webmanifest','sw.js','src/features/places/place-view.js','src/features/recommendations/recommendation-view.js','src/features/expenses/expense-view.js','src/features/expenses/expense-controller.js','src/features/checklists/checklist-view.js','src/features/checklists/checklist-controller.js','src/features/places/place-media.js'
 ];
 const size = file => fs.statSync(file).size;
 const gzip = file => zlib.gzipSync(fs.readFileSync(file), { level: 9 }).length;
