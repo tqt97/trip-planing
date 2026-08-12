@@ -8,17 +8,15 @@ export function createPlaceRow(place, { currentUserId, votes = [] } = {}) {
   const h = document.createElement('h3'); h.textContent = `${categoryIcon(place.category)} ${place.name}`;
   const p = document.createElement('p'); p.textContent = `${priorityLabel(place.priority)} · ${place.address || `${place.lat?.toFixed(5)}, ${place.lng?.toFixed(5)}`}`;
   const meta = document.createElement('div'); meta.className = 'route-meta';
+  const distance = document.createElement('span'); distance.className = 'route-pill distance'; distance.textContent = formatDistance(place.distanceMeters); distance.title = 'Khoảng cách từ Home';
   const source = document.createElement('span'); source.className = `route-pill ${place.routeSource === 'ors' ? 'real' : 'fallback'}`; source.textContent = place.routeSource === 'ors' ? '✓ Route ORS' : '≈ ETA Đà Lạt';
   const eta = document.createElement('span'); eta.className = 'route-pill'; eta.textContent = formatDuration(place.durationSeconds);
   const voteBtn = document.createElement('button'); voteBtn.type = 'button'; voteBtn.className = `vote-btn${hasUserVoted(place.id, currentUserId, votes) ? ' voted' : ''}`; voteBtn.dataset.action = 'vote'; voteBtn.textContent = `♥ ${votes.filter(v => v.place_id === place.id).length}`; voteBtn.title = 'Vote địa điểm'; voteBtn.disabled = !currentUserId;
-  meta.append(source, eta, voteBtn); main.append(h, p, meta);
+  meta.append(distance, source, eta, voteBtn); main.append(h, p, meta);
   if (place.note) { const note = document.createElement('p'); note.className = 'place-note'; note.textContent = place.note; main.append(note); }
   if (place.noteUrl) { const link = document.createElement('a'); link.className = 'place-note-link'; link.href = place.noteUrl; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '↗ Mở link ghi chú'; main.append(link); }
-  const distance = document.createElement('div'); distance.className = 'distance';
-  const strong = document.createElement('strong'); strong.textContent = formatDistance(place.distanceMeters);
-  const span = document.createElement('span'); span.textContent = 'từ Home'; distance.append(strong, span);
   const actions = document.createElement('div'); actions.className = 'row-actions'; actions.append(actionButton('G', 'Mở Google Maps', 'map', 'map-google'), actionButton('✎', 'Sửa', 'edit'), actionButton('↻', 'Tính lại', 'refresh'), actionButton('×', 'Xóa', 'delete', 'danger'));
-  row.append(main, distance, actions); return row;
+  row.append(main, actions); return row;
 }
 
 export function renderPagination(els, page) {

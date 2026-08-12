@@ -51,7 +51,7 @@
   <div class="atmosphere" aria-hidden="true"><i></i><i></i><i></i></div>
   <header class="topbar">
     <div class="brand-wrap"><div class="brand-title"><p class="eyebrow" id="appEyebrow">ĐÀ LẠT · TRIP COMPANION</p><h1 id="appTitle">Ní ơi, mình đi đâu thế.</h1></div><p class="subtitle" id="appSubtitle">Lên danh sách, xem khoảng cách và chọn nơi đáng đi ngay lúc này.</p></div>
-    <div class="top-actions desktop-actions"><button class="ghost" id="membersBtn">Nhóm</button><button class="ghost user-chip" id="userBtn" title="Tài khoản">Đang kết nối…</button><button class="ghost" id="exportBtn">Xuất</button><label class="ghost file-label">Nhập<input id="importInput" type="file" accept="application/json"></label><button class="primary" id="addBtn">+ Thêm địa điểm</button></div>
+    <div class="top-actions desktop-actions"><button class="ghost" id="membersBtn">Nhóm</button><button class="ghost user-chip" id="userBtn" title="Tài khoản">Đang kết nối…</button><button class="ghost" id="exportBtn">Xuất</button><label class="ghost file-label">Nhập<input id="importInput" type="file" accept="application/json"></label><button class="primary add-action" id="addBtn" type="button" aria-label="Thêm địa điểm" title="Thêm địa điểm">+</button></div>
   </header>
 
   <main class="shell">
@@ -106,13 +106,13 @@
 
 
     <section class="timeline-card glass collapsible-section" id="timelineSection">
-      <div class="section-heading compact section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge warm">🗓 TIMELINE</span><h2>Lịch trình chuyến đi</h2></div><div class="section-head-actions"><span id="timelineCount" class="meta">0 mục</span><button class="primary compact-action" id="addTimelineBtn" type="button">Thêm lịch</button></div></div>
+      <div class="section-heading compact section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge warm">🗓 TIMELINE</span><h2>Lịch trình</h2></div><div class="section-head-actions"><span id="timelineCount" class="meta">0 mục</span><button class="primary compact-action add-action" id="addTimelineBtn" type="button" aria-label="Thêm lịch trình" title="Thêm lịch trình">+</button></div></div>
       <div id="timelineList" class="timeline-list"></div>
       <div id="timelineEmpty" class="empty compact-empty"><div>🌤️</div><h3>Chưa có lịch trình</h3><p>Thêm lịch theo ngày và giờ; app sẽ tự sắp xếp từ sáng đến tối.</p></div>
     </section>
 
     <section class="expense-card glass collapsible-section" id="expenseSection">
-      <div class="section-heading compact expense-heading section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge warm">$ CHI TIÊU</span><h2>Chi tiêu chuyến đi</h2></div><div class="expense-head-actions"><button class="primary compact-action expense-add-btn" id="addExpenseBtn" type="button"><span aria-hidden="true">＋</span><span class="expense-add-label">Khoản chi</span></button></div></div>
+      <div class="section-heading compact expense-heading section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge warm">$ CHI TIÊU</span><h2>Chi tiêu chuyến đi</h2></div><div class="expense-head-actions"><button class="primary compact-action add-action" id="addExpenseBtn" type="button" aria-label="Thêm khoản chi" title="Thêm khoản chi">+</button></div></div>
       <div class="expense-summary">
         <div class="expense-total-block"><span>Tổng chi tiêu</span><strong id="expenseTotal">0 ₫</strong><small id="expenseCount">0 khoản</small></div>
         <label class="people-count-field"><span>Số người</span><input id="peopleCount" type="number" min="1" max="50" step="1" inputmode="numeric" value="4" aria-label="Số người chia chi phí"></label>
@@ -125,7 +125,7 @@
     </section>
 
     <section class="album-card-section glass collapsible-section" id="albumSection">
-      <div class="section-heading compact section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge warm">📷 ẢNH CHUYẾN ĐI</span><h2>Ảnh & link tham khảo</h2></div><div class="section-head-actions"><button class="primary compact-action" id="addAlbumBtn" type="button">Thêm ảnh</button></div></div>
+      <div class="section-heading compact section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge warm">📷 ẢNH CHUYẾN ĐI</span><h2>Ảnh</h2></div><div class="section-head-actions"><button class="primary compact-action add-action" id="addAlbumBtn" type="button" aria-label="Thêm ảnh" title="Thêm ảnh">+</button></div></div>
       <div class="album-toolbar" aria-label="Bộ lọc ảnh chuyến đi"><label class="album-filter-field" for="albumFilter"><span>Lọc</span><select id="albumFilter"><option value="all">Tất cả</option><option value="reference">📌 Tham khảo</option><option value="want">⭐ Muốn đi</option><option value="visited">✓ Đã đi</option></select></label><span id="albumCount" class="album-count-pill">0 mục</span><strong id="albumVisibleCount" class="album-filter-summary">Tất cả</strong></div>
       <div id="albumList" class="album-strip" aria-label="Ảnh chuyến đi"></div>
       <nav id="albumPagination" class="pagination compact-pagination" aria-label="Phân trang ảnh và link tham khảo" hidden><button class="pager-btn" id="albumPrevPageBtn" type="button" aria-label="Trang ảnh trước">←</button><div id="albumPageNumbers" class="page-numbers"></div><button class="pager-btn" id="albumNextPageBtn" type="button" aria-label="Trang ảnh sau">→</button><span id="albumPageSummary" class="page-summary"></span></nav>
@@ -133,7 +133,7 @@
     </section>
 
     <section class="checklist-card glass collapsible-section" id="checklistSection">
-      <div class="section-heading compact section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge">✅ CHECKLIST</span><h2>Chuẩn bị & việc cần làm</h2></div><div class="section-head-actions"><button class="primary compact-action" id="addChecklistBtn" type="button">Thêm mục</button></div></div>
+      <div class="section-heading compact section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge">✅ CHECKLIST</span><h2>Công việc</h2></div><div class="section-head-actions"><button class="primary compact-action add-action" id="addChecklistBtn" type="button" aria-label="Thêm công việc" title="Thêm công việc">+</button></div></div>
       <div class="checklist-summary"><span id="checklistCount">0 mục</span><strong id="checklistDoneCount">0/0 hoàn thành</strong></div>
       <div id="checklistList" class="checklist-list"></div>
       <div id="checklistEmpty" class="empty compact-empty" hidden><div>🎒</div><h3>Checklist đang trống</h3><p>Thêm đồ cần chuẩn bị hoặc việc cần làm trong chuyến đi.</p></div>
@@ -142,7 +142,7 @@
     <section class="cluster-card glass collapsible-section" id="togetherSection"><div class="section-heading compact section-collapse-hit" role="button" tabindex="0" aria-expanded="true"><div><span class="badge together-badge">🧭 ĐI CÙNG NHAU</span><h2>Gom điểm gần nhau</h2></div><div class="section-head-actions"><p>Những nơi gần nhau để đi cùng một lượt.</p></div></div><div id="clusters" class="clusters"></div></section>
   </main>
 
-  <button class="mobile-fab" id="mobileAddBtn" aria-label="Thêm địa điểm"><span class="fab-pin" aria-hidden="true">🗺️</span></button>
+  <button class="mobile-fab add-action" id="mobileAddBtn" aria-label="Thêm địa điểm" title="Thêm địa điểm">+</button>
   <nav class="mobile-nav" aria-label="Điều hướng nhanh"><button data-scroll="top">⌂<span>Tổng quan</span></button><button data-scroll="places">⌖<span>Địa điểm</span></button><button data-scroll="checklist">✓<span>Checklist</span></button><button data-scroll="expenses"><b class="money-tab-icon" aria-hidden="true">$</b><span>Chi tiêu</span></button><button id="traceBtn">◎<span>Nhật ký</span></button></nav>
 
   <dialog id="placeDialog"><form id="placeForm" method="dialog" novalidate class="place-form"><div class="dialog-head"><div><span class="badge">NEW PLACE</span><h2 id="placeDialogTitle">Thêm địa điểm</h2></div><button type="button" class="icon-btn close-dialog" aria-label="Đóng">×</button></div><input type="hidden" id="placeId"><label><span class="field-label">Tên địa điểm <b class="required-mark" aria-hidden="true">*</b><span class="sr-only"> bắt buộc</span></span><input id="placeName" maxlength="120" required placeholder="Bánh căn Nhà Chung"></label><label><span class="field-label">Google Maps URL</span><input id="placeMapsUrl" maxlength="2000" inputmode="url" placeholder="Dán link Google Maps"></label><label><span class="field-label">Địa chỉ</span><input id="placeAddress" maxlength="300" placeholder="13 Nhà Chung, Đà Lạt"></label><div class="form-grid form-grid-compact"><label><span class="field-label">Loại</span><select id="placeCategory"><option value="food">🍜 Ăn uống</option><option value="cafe">☕ Cafe</option><option value="attraction">🌲 Vui chơi</option><option value="shopping">🛍 Mua sắm</option><option value="other">📌 Khác</option></select></label><label><span class="field-label">Ưu tiên</span><select id="placePriority"><option value="must">🔥 Must go</option><option value="want" selected>⭐ Muốn đi</option><option value="maybe">💭 Có thể</option></select></label></div><label><span class="field-label">Ghi chú</span><textarea id="placeNote" maxlength="500" rows="3" placeholder="Ăn sáng, đi sớm, cần đặt bàn…"></textarea></label><label><span class="field-label">Link ghi chú</span><input id="placeNoteUrl" maxlength="1200" inputmode="url" placeholder="https://docs.google.com/... hoặc link tham khảo"></label><label class="image-upload-field"><span class="field-label">Hình địa điểm</span><input id="placeImage" type="file" accept="image/jpeg,image/png,image/webp,image/gif"><small>JPG/PNG/WebP/GIF · tối đa 5 MB</small><img id="placeImagePreview" class="place-image-preview" alt="Xem trước hình địa điểm" hidden></label><details id="placeCoordsDetails"><summary>Tọa độ <b class="required-mark" aria-hidden="true">*</b><span class="sr-only"> bắt buộc</span></summary><div class="form-grid form-grid-compact"><label><span class="field-label">Latitude</span><input id="placeLat" inputmode="decimal" placeholder="11.9404"></label><label><span class="field-label">Longitude</span><input id="placeLng" inputmode="decimal" placeholder="108.4583"></label></div></details><p class="form-message" id="placeMessage" role="alert"></p><div class="dialog-actions"><button type="button" class="ghost close-dialog">Hủy</button><button type="submit" class="primary" id="savePlaceBtn">Lưu địa điểm</button></div></form></dialog>
@@ -166,7 +166,7 @@
 
   <dialog id="traceDialog" class="trace-dialog"><div class="trace-panel"><div class="dialog-head"><div><span class="badge">DIAGNOSTICS</span><h2>Nhật ký hệ thống</h2></div><button type="button" class="icon-btn" id="closeTraceBtn">×</button></div><div id="systemHealth" class="health-card"></div><div class="trace-actions"><button class="ghost" id="copyTraceBtn">Copy log</button><button class="ghost" id="clearTraceBtn">Xóa log</button></div><div id="traceList" class="trace-list"></div></div></dialog>
 
-  <button id="backToTop" class="back-to-top" type="button" aria-label="Lên đầu trang" title="Lên đầu trang">↑<span>🌲</span></button>
+  <button id="backToTop" class="back-to-top" type="button" aria-label="Lên đầu trang" title="Lên đầu trang">↑</button>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

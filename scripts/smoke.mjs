@@ -56,7 +56,7 @@ if (!hasCss(/\.stats article\s*\{[^}]*min-width:\s*0[^}]*min-height:\s*62px/s)) 
 if (!hasCss(/@media\s*\(max-width:\s*360px\)[\s\S]*?\.stats\s*\{[^}]*grid-template-columns:\s*repeat\(2/s)) throw new Error('Smoke failed: small-phone stats fallback missing');
 if (!hasCss(/@media\s*\(max-width:\s*820px\)[\s\S]*?\.places-list,\.expense-list,\.checklist-list\{[^}]*max-height:\s*none[^}]*overflow:\s*visible/s)) throw new Error('Smoke failed: mobile lists must use natural page scroll');
 if (!/@media\s*\(max-width:\s*360px\)/.test(css)) throw new Error('Smoke failed: small-phone breakpoint missing');
-if (!/font-size:\s*40px/.test(css)) throw new Error('Smoke failed: mobile H1 40px guard missing');
+if (!/font-size:\s*39px/.test(css)) throw new Error('Smoke failed: mobile H1 39px guard missing');
 if (!hasCss(/body\s*\{[^}]*overflow-x:\s*clip/s)) throw new Error('Smoke failed: horizontal overflow guard missing');
 
 // CSS/JS cleanliness. Source files are checked separately so formatting does not create false failures.

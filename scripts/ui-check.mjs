@@ -30,12 +30,12 @@ assert(has(/@media\s*\(max-width:\s*820px\)[\s\S]*?\.places-list,\.expense-list,
 assert(has(/\.mobile-fab\s*\{[^}]*right:\s*14px[^}]*bottom:\s*calc\(76px/s) && has(/\.back-to-top\s*\{[^}]*right:\s*14px[^}]*bottom:\s*calc\(122px/s), 'floating control stack is not aligned right');
 assert(has(/\.place-form \.form-grid-compact\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/s), 'paired mobile form fields missing');
 assert(has(/\.row-actions\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/s), 'place actions must stay one horizontal row');
-assert(has(/\.route-meta\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)[^}]*align-items:\s*stretch/s), 'route-meta must be equal 3-column grid on base/desktop');
-assert(has(/\.route-meta>\.route-pill,\.route-meta>\.vote-btn\{[^}]*height:\s*34px[^}]*align-items:\s*center[^}]*justify-content:\s*center/s), 'route-meta children must share height and center alignment');
+assert(has(/\.route-meta\s*\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)[^}]*align-items:\s*stretch/s), 'route-meta must be equal 4-column grid with distance first');
+assert(has(/\.route-meta>\.route-pill,\.route-meta>\.vote-btn\{[^}]*height:\s*32px[^}]*align-items:\s*center[^}]*justify-content:\s*center/s), 'route-meta children must share compact height and center alignment');
 assert(has(/\.cluster-places\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/s), 'cluster details must use two-column layout');
 assert(css.includes('.radar-place:hover .radar-place-label') && css.includes('.radar-sweep'), 'radar hover labels and scan lines missing');
 assert(html.includes('id="homeMapBtn"'), 'Home Google Maps action missing');
-assert(has(/@media\s*\(max-width:\s*480px\)[\s\S]*?font-size:\s*40px/s), 'mobile H1 must remain 40px');
+assert(has(/@media\s*\(max-width:\s*480px\)[\s\S]*?font-size:\s*39px/s), 'mobile H1 must remain 39px');
 assert(has(/@media\s*\(max-width:\s*360px\)[\s\S]*?\.stats\s*\{[^}]*grid-template-columns:\s*repeat\(2/s), '320-360px stats must fall back to two columns');
 assert(css.includes('.section-collapse-hit:hover') && css.includes('box-shadow:'), 'collapse affordance must be surface-based');
 assert(html.includes('role="button" tabindex="0" aria-expanded="true"'), 'collapsible headers need keyboard semantics');
@@ -60,7 +60,11 @@ assert(/\.album-strip\s*\{[^}]*grid-template-columns:\s*repeat\(4/.test(css) && 
 assert(html.includes('class="album-toolbar"') && !html.includes('id="albumImagePreview"'), 'album filter placement or preview removal regression');
 assert(css.includes('.checklist-row') && css.includes('.place-image-preview'), 'v2.6 feature styles missing');
 
-assert(html.includes('id="addAlbumBtn" type="button">Thêm ảnh</button>'), 'Image CTA must say Thêm ảnh');
+assert(/id="addAlbumBtn"[^>]*>\+<\/button>/.test(html), 'Image CTA must use the shared plus icon');
+assert(/id="addTimelineBtn"[^>]*>\+<\/button>/.test(html) && /id="addChecklistBtn"[^>]*>\+<\/button>/.test(html) && /id="addExpenseBtn"[^>]*>\+<\/button>/.test(html), 'section add CTAs must use the same plus icon');
+assert(!/id="backToTop"[^>]*>[\s\S]*?<span>🌲<\/span>/.test(html), 'Back-to-top must not contain the tree decoration');
+assert(html.includes('<h2>Lịch trình</h2>') && html.includes('<h2>Ảnh</h2>') && html.includes('<h2>Công việc</h2>'), 'compact section titles missing');
+
 assert(html.includes('id="expensePagination"') && html.includes('id="albumPagination"'), 'Expense and Album pagination controls missing');
 const compactPagerSource = fs.readFileSync('src/features/common/pagination-view.js', 'utf8');
 const placeViewSource = fs.readFileSync('src/features/places/place-view.js', 'utf8');

@@ -1,4 +1,4 @@
-const CACHE='dalat-planner-v2.9.5';
+const CACHE='dalat-planner-v2.9.6';
 const PREFIX='dalat-planner-';
 const CORE=['/','/index.html','/styles.css','/app.js','/favicon.svg','/manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())));
